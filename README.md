@@ -8,7 +8,11 @@ The extension UI is in English, with Chinese available as an optional language (
 
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and select the `extension/` folder of this repo.
-3. Open https://tenten.art and log in once. The extension picks up the session from the page and keeps it, so it keeps working after you close the tab and after a browser restart. You only need to visit the site again if the session expires or you log out (the popup will say so).
+3. Open https://tenten.art and log in. The extension picks up the session from the page and keeps it, so it keeps working after you close the tab and after a browser restart.
+
+### Staying logged in
+
+The site's login token is valid for exactly 24 hours and the site has no way to refresh it, so you have to log in again once a day. The extension reminds you: a notification about an hour before it expires, and a persistent one (plus a red **!** on the toolbar icon) once it has. Click it to open the site and log in; queued drawings simply wait meanwhile and the extension resumes on its own.
 4. Click the toolbar icon → **Open queue**.
 
 After pulling new code, click the reload button on the extension's card in `chrome://extensions`, then refresh any open tenten.art tab.
@@ -18,6 +22,7 @@ After pulling new code, click the reload button on the extension's card in `chro
 - **On the site's assignment page.** Paste, drop or pick your image in the site's own upload box as usual, then click **加入 Chamber 队列** below the site's **提交作业** button. The image is queued for the node you are viewing and is submitted when a slot frees up. **提交作业** still submits immediately. If you queue a node and then also submit it directly on the site, the queued item stops and tells you instead of submitting a second time.
 - **Queue page.** Drop, paste or pick an image, choose the target node, and click **Add to queue**. Nodes that cannot be submitted are greyed out; hover for the reason. A locked node can be queued if the node before it is already queued or under review; it waits until that node is approved.
 - **Submission order.** When a slot frees up, the next item is picked by: earliest deadline → revisions (a returned node blocks every later node) → required before optional → your own order. The queue page lists items in that order and tags them **Due MM-DD**, **Revision**, **Optional**. Drag (or Alt+↑/↓) to reorder within the same priority; Delete removes.
+- **Updating a queued drawing.** Queued items have **Replace image** on the queue page. Locked nodes queued behind an earlier node go out automatically once that node is approved, so if a returned earlier node means a later drawing needs changes, replace it before then.
 - **Revisions.** When a submission comes back as reviewed / returned / shelved, its item turns into **Revision** with the teacher's feedback and review images. The returned image is never sent again. Queue your revised drawing like any other (on the site or the queue page) and it replaces that item.
 - **Popup.** Slot meter (one dot per slot, filled = in use), what is being submitted, what is in review with the platform's queue position and estimate, what needs attention, what is next, and **Pause all**.
 - **Floating badge** in the bottom-right of the assignment page: hover it and click to open the queue page for that assignment. × hides it for the tab.
@@ -54,6 +59,7 @@ Verified against the live API and the site's front-end bundle. Keep this table u
 | Topic | Behaviour |
 |---|---|
 | Auth | `localStorage["tenten-auth"].token`, sent as `Authorization: Bearer <token>` |
+| Session | The token is an HS512 JWT with a fixed 24 h lifetime (`exp`). There is no refresh endpoint; on 401 the site just logs out |
 | CORS | Any request with `Origin: chrome-extension://…` gets `403 Invalid CORS request`. Chrome omits Origin on the worker's GETs but sends it on POST/PUT, so a declarativeNetRequest session rule strips Origin from the worker's requests (pages are unaffected) |
 | Main data | `GET /api/student/courses/terms/{termId}/weeks` returns the whole assignment tree and `maxPendingSubmissions` |
 | Slot count | Submissions in `SUBMITTED` / `REVIEWING` take a slot. The site counts the last round per assignment; the extension counts the last round per node (can only over-count) |

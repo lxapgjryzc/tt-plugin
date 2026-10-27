@@ -7,6 +7,7 @@ export const KEYS = {
   snapshot: 'chamber:snapshot', // last term summary for the popup (local, small)
   token: 'chamber:token', // the site's bearer token (local storage, survives restarts)
   lastTick: 'chamber:lastTick',
+  sessionNotice: 'chamber:sessionNotice', // which login notification was last shown
 };
 
 export const DEFAULTS = {

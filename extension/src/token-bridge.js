@@ -8,9 +8,17 @@
 
 import { target } from './target.js';
 import { KEYS } from './storage/settings.js';
+import { tokenExpiry } from './session.js';
 
 const CACHE_MS = 30_000;
 let mem = { token: null, at: 0 };
+
+// A token we can still use: not past its JWT expiry (tokens without one are trusted).
+export function usable(token) {
+  if (!token) return false;
+  const exp = tokenExpiry(token);
+  return exp === null || exp > Date.now();
+}
 
 async function readFromTab() {
   const tabs = await chrome.tabs.query({ url: `${target.base}/*` });
@@ -37,15 +45,17 @@ export async function storeToken(token) {
   else await chrome.storage.local.remove(KEYS.token);
 }
 
+// `fresh` skips the in-memory cache (used after the server rejected a token; the
+// rejected one has already been dropped from storage by then).
 export async function getToken({ fresh = false } = {}) {
-  if (!fresh && mem.token && Date.now() - mem.at < CACHE_MS) return mem.token;
+  if (!fresh && usable(mem.token) && Date.now() - mem.at < CACHE_MS) return mem.token;
   const live = await readFromTab();
-  if (live) {
+  if (usable(live)) {
     await storeToken(live);
     return live;
   }
-  if (fresh) return null;
-  const { [KEYS.token]: cached } = await chrome.storage.local.get(KEYS.token);
-  if (cached) mem = { token: cached, at: Date.now() };
-  return cached || null;
+  const { [KEYS.token]: stored } = await chrome.storage.local.get(KEYS.token);
+  if (!usable(stored)) return null;
+  mem = { token: stored, at: Date.now() };
+  return stored;
 }

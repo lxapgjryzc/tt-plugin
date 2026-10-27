@@ -541,6 +541,23 @@
   "reasonSubmittedElsewhere": {
     "message": "加入队列后，该节点已在网站上直接提交过。请到网站确认，再决定重试或移除。"
   },
+  "notifyLoggedOutTitle": {
+    "message": "已退出 tenten.art 登录"
+  },
+  "notifyLoggedOutBody": {
+    "message": "自动提交已暂停，队列中的作业正在等待。点击重新登录。"
+  },
+  "notifyExpiringTitle": {
+    "message": "tenten.art 登录即将过期"
+  },
+  "notifyExpiringBody": {
+    "message": "将于 $P1$ 过期。在网站上重新登录即可继续自动提交。",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "notifyRevision": {
     "message": "作业需修改"
   },

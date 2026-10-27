@@ -54,6 +54,7 @@ export async function runTick(deps, { manual = false, owner = crypto.randomUUID(
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {
       await deps.settings.set({ sessionInvalid: true });
+      await deps.dropToken?.();
       await audit({ action: 'session', result: 'invalid' });
       await deps.saveSnapshot(summarize(target, null, { why: 'sessionInvalid' }, 'sessionInvalid'));
       return { why: 'sessionInvalid' };

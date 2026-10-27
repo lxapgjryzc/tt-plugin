@@ -7,7 +7,8 @@ import { runTick } from './engine.js';
 import { selectTerm, listAssignments, countPending, findAssignment, nodeSubmissions, label } from './model.js';
 import { canQueue } from './scheduler.js';
 import { loadMessages, format, PAGE_LOCALE } from './i18n.js';
-import { getToken, storeToken } from './token-bridge.js';
+import { getToken, storeToken, usable } from './token-bridge.js';
+import { sessionState, tokenExpiry } from './session.js';
 import * as store from './storage/idb.js';
 import {
   KEYS, getSettings, setSettings, appendAudit, getAudit, acquireLock, refreshLock, releaseLock,
@@ -27,6 +28,7 @@ const deps = {
     if (entry.action === 'reconcile') notifyTransition(entry);
   },
   getToken,
+  dropToken: () => storeToken(null),
   saveSnapshot: (snap) => chrome.storage.local.set({ [KEYS.snapshot]: snap }),
   now: () => Date.now(),
 };
@@ -76,6 +78,7 @@ async function tick({ manual = false } = {}) {
     } finally {
       running = null;
       await refreshBadge();
+      await checkSession();
       broadcast();
     }
   })();
@@ -109,16 +112,47 @@ function broadcast() {
 // ---- action badge & notifications --------------------------------------
 
 async function refreshBadge() {
-  const [s, backlog, { [KEYS.snapshot]: snap }] = await Promise.all([
-    getSettings(), store.listBacklog(), chrome.storage.local.get(KEYS.snapshot),
+  const [s, backlog, { [KEYS.snapshot]: snap, [KEYS.token]: token }] = await Promise.all([
+    getSettings(), store.listBacklog(), chrome.storage.local.get([KEYS.snapshot, KEYS.token]),
   ]);
   const revision = backlog.filter((i) => i.status === 'needs_revision' || i.status === 'blocked' || i.status === 'failed').length;
+  const loggedOut = ['expired', 'invalid', 'missing'].includes(sessionState({ token, sessionInvalid: s.sessionInvalid }));
   let text = '';
-  if (s.paused) text = '||';
+  if (loggedOut) text = '!';
+  else if (s.paused) text = '||';
   else if (revision) text = String(revision);
   else if (snap?.limit != null) text = `${snap.pending.length}/${snap.limit}`;
   await chrome.action.setBadgeText({ text });
-  await chrome.action.setBadgeBackgroundColor({ color: revision || s.paused ? '#c2410c' : '#1c1c1c' });
+  await chrome.action.setBadgeBackgroundColor({ color: loggedOut || revision || s.paused ? '#c2410c' : '#1c1c1c' });
+}
+
+// ---- login reminders ----------------------------------------------------
+// The site's token lives exactly 24 h and cannot be refreshed, so warn an hour
+// before it expires and again (persistently) once it has. Each notice is shown once.
+const LOGIN_NOTE = 'chamber-login';
+
+async function checkSession() {
+  const s = await getSettings();
+  const { [KEYS.token]: token, [KEYS.sessionNotice]: shown } = await chrome.storage.local.get([KEYS.token, KEYS.sessionNotice]);
+  const state = sessionState({ token, sessionInvalid: s.sessionInvalid });
+  const exp = tokenExpiry(token);
+  const notice = state === 'expiring' ? `expiring:${exp}` : state === 'ok' ? null : 'loggedOut';
+  if (notice === (shown ?? null)) return;
+  if (!notice) {
+    await chrome.storage.local.remove(KEYS.sessionNotice);
+    chrome.notifications.clear(LOGIN_NOTE);
+    return;
+  }
+  await chrome.storage.local.set({ [KEYS.sessionNotice]: notice });
+  const messages = await loadMessages(s.locale);
+  const time = exp ? new Date(exp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  chrome.notifications.create(LOGIN_NOTE, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/128.png'),
+    title: format(messages, notice === 'loggedOut' ? 'notifyLoggedOutTitle' : 'notifyExpiringTitle'),
+    message: format(messages, notice === 'loggedOut' ? 'notifyLoggedOutBody' : 'notifyExpiringBody', [time]),
+    requireInteraction: notice === 'loggedOut',
+  });
 }
 
 async function notifyTransition(entry) {
@@ -134,7 +168,11 @@ async function notifyTransition(entry) {
   });
 }
 
-chrome.notifications.onClicked.addListener(() => openQueue());
+chrome.notifications.onClicked.addListener((id) => {
+  chrome.notifications.clear(id);
+  if (id === LOGIN_NOTE) chrome.tabs.create({ url: `${target.base}/` });
+  else openQueue();
+});
 
 async function openQueue(query = '') {
   const url = chrome.runtime.getURL(`ui/options.html${query}`);
@@ -195,10 +233,14 @@ self.chamber = { probe, tick, getAudit, getSettings, setSettings, listBacklog: s
 const handlers = {
   'chamber:token': async ({ token }, sender) => {
     if (!sender.url?.startsWith(target.base)) return { ok: false };
+    // The site may still hold an expired token until its next API call logs it out.
+    const next = usable(token) ? token : null;
     const prev = (await chrome.storage.local.get(KEYS.token))[KEYS.token];
-    await storeToken(token || null);
-    const s = await getSettings();
-    if (token && (token !== prev || s.sessionInvalid)) tickSoon();
+    if (next === prev) return { ok: true };
+    await storeToken(next);
+    if (next) tickSoon(); // a fresh login: resume (the tick clears sessionInvalid)
+    await refreshBadge();
+    await checkSession();
     return { ok: true };
   },
   'chamber:pageNav': async () => { tickSoon(); return { ok: true }; },
@@ -266,4 +308,4 @@ chrome.alarms.onAlarm.addListener((a) => { if (a.name === ALARM) tick(); });
 chrome.runtime.onInstalled.addListener(() => { ensureAlarm(); tickSoon(500); });
 chrome.runtime.onStartup.addListener(() => { ensureAlarm(); tickSoon(500); });
 ensureAlarm();
-refreshBadge().catch(() => {});
+refreshBadge().then(checkSession).catch(() => {});

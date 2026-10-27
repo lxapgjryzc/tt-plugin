@@ -165,6 +165,10 @@ export default [
   ['enqueuedChained', 'Queued after the previous node. It will be submitted once that node is approved.', '已排在上一节点后面，等上一节点通过后自动提交。'],
   ['enqueueFailed', 'Could not add to the queue', '加入队列失败'],
   ['reasonSubmittedElsewhere', 'This node was submitted on the site after you queued it. Check there, then Retry or remove.', '加入队列后，该节点已在网站上直接提交过。请到网站确认，再决定重试或移除。'],
+  ['notifyLoggedOutTitle', 'Logged out of tenten.art', '已退出 tenten.art 登录'],
+  ['notifyLoggedOutBody', 'Submissions are paused and your queue is waiting. Click to log in again.', '自动提交已暂停，队列中的作业正在等待。点击重新登录。'],
+  ['notifyExpiringTitle', 'tenten.art login expires soon', 'tenten.art 登录即将过期'],
+  ['notifyExpiringBody', 'It expires at $1. Log in again on the site to keep submissions going.', '将于 $1 过期。在网站上重新登录即可继续自动提交。'],
   ['notifyRevision', 'Returned for revision', '作业需修改'],
   ['notifyApproved', 'Approved', '作业已通过'],
 ];

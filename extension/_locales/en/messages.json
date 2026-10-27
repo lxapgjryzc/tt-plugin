@@ -541,6 +541,23 @@
   "reasonSubmittedElsewhere": {
     "message": "This node was submitted on the site after you queued it. Check there, then Retry or remove."
   },
+  "notifyLoggedOutTitle": {
+    "message": "Logged out of tenten.art"
+  },
+  "notifyLoggedOutBody": {
+    "message": "Submissions are paused and your queue is waiting. Click to log in again."
+  },
+  "notifyExpiringTitle": {
+    "message": "tenten.art login expires soon"
+  },
+  "notifyExpiringBody": {
+    "message": "It expires at $P1$. Log in again on the site to keep submissions going.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "notifyRevision": {
     "message": "Returned for revision"
   },

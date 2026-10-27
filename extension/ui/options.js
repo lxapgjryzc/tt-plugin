@@ -138,7 +138,7 @@ function itemRow(item, index) {
   if (['blocked', 'failed'].includes(item.status)) {
     actions.append(el('button', { type: 'button', text: t('retry'), onclick: () => retry(item) }));
   }
-  if (['needs_revision', 'blocked', 'failed'].includes(item.status)) {
+  if (['queued', 'needs_revision', 'blocked', 'failed'].includes(item.status)) {
     actions.append(el('button', { type: 'button', text: t('replaceImage'), onclick: () => pickReplacement(item.id) }));
   }
 

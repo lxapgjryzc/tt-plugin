@@ -1,0 +1,550 @@
+{
+  "extName": {
+    "message": "Chamber 作业排队"
+  },
+  "extDescription": {
+    "message": "为 tenten.art 排队待交作业，批改名额空出时自动提交。"
+  },
+  "queuePageTitle": {
+    "message": "Chamber · 作业队列"
+  },
+  "slotsFree": {
+    "message": "空闲名额 $P1$ / $P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "slotsUnknown": {
+    "message": "名额未知"
+  },
+  "lastChecked": {
+    "message": "$P1$检查",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "agoSeconds": {
+    "message": "$P1$ 秒前",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "agoMinutes": {
+    "message": "$P1$ 分钟前",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "modePaused": {
+    "message": "已暂停"
+  },
+  "modeDryRun": {
+    "message": "演练模式"
+  },
+  "modeManual": {
+    "message": "手动"
+  },
+  "noTab": {
+    "message": "请打开 tenten.art 并登录。"
+  },
+  "sessionInvalid": {
+    "message": "登录已失效，请打开 tenten.art 重新登录。"
+  },
+  "openSite": {
+    "message": "打开 tenten.art"
+  },
+  "loadError": {
+    "message": "加载失败：$P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "needsAttention": {
+    "message": "需要处理"
+  },
+  "nowSubmitting": {
+    "message": "正在提交"
+  },
+  "inReview": {
+    "message": "批改中"
+  },
+  "noneInReview": {
+    "message": "当前没有待批改的作业。"
+  },
+  "nextUp": {
+    "message": "接下来"
+  },
+  "nMore": {
+    "message": "…… 还有 $P1$ 项",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "emptyQueue": {
+    "message": "队列为空。在队列页拖入一张图片。"
+  },
+  "pauseAll": {
+    "message": "全部暂停"
+  },
+  "resumeAll": {
+    "message": "继续"
+  },
+  "openQueue": {
+    "message": "打开队列"
+  },
+  "addImage": {
+    "message": "添加图片"
+  },
+  "remove": {
+    "message": "移除"
+  },
+  "removeItem": {
+    "message": "移除 $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "stopTracking": {
+    "message": "不再跟踪（不会撤回提交）"
+  },
+  "controls": {
+    "message": "控制"
+  },
+  "autoSubmit": {
+    "message": "自动提交"
+  },
+  "dryRun": {
+    "message": "演练模式"
+  },
+  "tickEvery": {
+    "message": "检查间隔"
+  },
+  "seconds": {
+    "message": "$P1$ 秒",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "language": {
+    "message": "语言"
+  },
+  "langAuto": {
+    "message": "自动（跟随浏览器）"
+  },
+  "langEn": {
+    "message": "English"
+  },
+  "langZh": {
+    "message": "中文"
+  },
+  "runOnce": {
+    "message": "立即检查一次"
+  },
+  "hintPaused": {
+    "message": "已暂停，不会上传或提交任何内容。"
+  },
+  "hintDryRun": {
+    "message": "演练模式：只在活动日志中记录将要提交的内容，不会真正发送。"
+  },
+  "hintAuto": {
+    "message": "自动提交已开启：名额空出时逐个提交队列中的作业。"
+  },
+  "hintManual": {
+    "message": "自动提交已关闭：点“立即检查一次”提交下一项。"
+  },
+  "backlog": {
+    "message": "待交队列"
+  },
+  "reorderHint": {
+    "message": "按此顺序提交：截止时间最早的优先，其次是修改稿，再其次是必做作业。同一优先级内可拖动（或 Alt+↑ / Alt+↓）调整顺序，Delete 键移除。"
+  },
+  "prioDeadline": {
+    "message": "截止 $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "prioRevision": {
+    "message": "修改稿"
+  },
+  "prioOptional": {
+    "message": "选做"
+  },
+  "clearFinished": {
+    "message": "清除已通过"
+  },
+  "moveUp": {
+    "message": "上移"
+  },
+  "moveDown": {
+    "message": "下移"
+  },
+  "retry": {
+    "message": "重试"
+  },
+  "replaceImage": {
+    "message": "更换图片"
+  },
+  "reviewImage": {
+    "message": "批改图 $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "addItem": {
+    "message": "加入队列"
+  },
+  "dropAria": {
+    "message": "选择、拖入或粘贴图片"
+  },
+  "dropHint": {
+    "message": "拖入、粘贴或点击选择图片"
+  },
+  "dropSub": {
+    "message": "最大 10 MB"
+  },
+  "fileInfo": {
+    "message": "$P1$ · $P2$ MB",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "searchNodes": {
+    "message": "搜索作业和节点"
+  },
+  "showAll": {
+    "message": "显示已通过"
+  },
+  "pickNode": {
+    "message": "目标节点"
+  },
+  "wholeAssignment": {
+    "message": "整个作业"
+  },
+  "chained": {
+    "message": "排在上一节点后"
+  },
+  "chainedHint": {
+    "message": "当前未解锁，会等上一节点通过后再提交。"
+  },
+  "noMatches": {
+    "message": "没有匹配的节点。"
+  },
+  "loading": {
+    "message": "加载中……"
+  },
+  "pickerUnavailable": {
+    "message": "无法加载作业，请打开 tenten.art 并登录。"
+  },
+  "addToQueue": {
+    "message": "加入队列"
+  },
+  "errNoImage": {
+    "message": "请先选择图片。"
+  },
+  "errNotImage": {
+    "message": "该文件不是图片。"
+  },
+  "errEmptyFile": {
+    "message": "文件为空。"
+  },
+  "errTooLarge": {
+    "message": "图片超过 10 MB。"
+  },
+  "errNoNode": {
+    "message": "请选择目标节点。"
+  },
+  "auditLog": {
+    "message": "活动日志"
+  },
+  "stQueued": {
+    "message": "排队中"
+  },
+  "stUploading": {
+    "message": "上传中"
+  },
+  "stSubmitting": {
+    "message": "提交中"
+  },
+  "stPending": {
+    "message": "待批改"
+  },
+  "stRevision": {
+    "message": "需修改"
+  },
+  "stDone": {
+    "message": "已通过"
+  },
+  "stBlocked": {
+    "message": "受阻"
+  },
+  "stFailed": {
+    "message": "失败"
+  },
+  "nsSubmitted": {
+    "message": "待批改"
+  },
+  "nsReviewing": {
+    "message": "批改中"
+  },
+  "nsReviewed": {
+    "message": "已批改"
+  },
+  "nsReturned": {
+    "message": "已退回"
+  },
+  "nsShelved": {
+    "message": "批改待定"
+  },
+  "nsApproved": {
+    "message": "已通过"
+  },
+  "nsLocked": {
+    "message": "未解锁"
+  },
+  "nsNone": {
+    "message": "未提交"
+  },
+  "typeBasic": {
+    "message": "基础"
+  },
+  "typeExtended": {
+    "message": "扩展"
+  },
+  "typeAdvanced": {
+    "message": "进阶"
+  },
+  "typeBiWeekly": {
+    "message": "双周"
+  },
+  "typeGraduation": {
+    "message": "毕业设计"
+  },
+  "typeDrill": {
+    "message": "团练打卡"
+  },
+  "typeOther": {
+    "message": "其他"
+  },
+  "reasonAssignmentMissing": {
+    "message": "作业已不存在"
+  },
+  "reasonNodeMissing": {
+    "message": "节点已不存在"
+  },
+  "reasonTermInactive": {
+    "message": "学期未进行中"
+  },
+  "reasonClosed": {
+    "message": "作业已关闭或已过截止时间"
+  },
+  "reasonBlocked": {
+    "message": "前置条件未满足"
+  },
+  "reasonLocked": {
+    "message": "节点未解锁"
+  },
+  "reasonLockedNoChain": {
+    "message": "未解锁：请先将上一节点加入队列或提交"
+  },
+  "reasonApproved": {
+    "message": "节点已通过"
+  },
+  "reasonPendingOnNode": {
+    "message": "该节点已在等待批改"
+  },
+  "reasonAlreadyQueued": {
+    "message": "已在队列中"
+  },
+  "reasonNodeChanged": {
+    "message": "平台上该节点已变化，请到平台确认"
+  },
+  "reasonInterrupted": {
+    "message": "已中断，将继续"
+  },
+  "reasonImageMissing": {
+    "message": "本地图片丢失"
+  },
+  "reasonTooLarge": {
+    "message": "图片超过 10 MB"
+  },
+  "reasonUploadRetry": {
+    "message": "上传失败，稍后重试"
+  },
+  "reasonUploadFailed": {
+    "message": "上传失败"
+  },
+  "reasonServerRejected": {
+    "message": "平台拒绝提交"
+  },
+  "waitSlot": {
+    "message": "等待空闲名额"
+  },
+  "waitTurn": {
+    "message": "排队等待"
+  },
+  "waitLocked": {
+    "message": "等待上一节点通过"
+  },
+  "waitNodePending": {
+    "message": "等待：该节点正在批改"
+  },
+  "waitSameNode": {
+    "message": "等待同一节点的前一项"
+  },
+  "waitBackoff": {
+    "message": "稍后重试上传"
+  },
+  "waitAutoOff": {
+    "message": "就绪，自动提交未开启"
+  },
+  "why_paused": {
+    "message": "已暂停"
+  },
+  "why_sessionInvalid": {
+    "message": "登录已失效"
+  },
+  "why_noToken": {
+    "message": "未登录"
+  },
+  "why_noTerm": {
+    "message": "没有进行中的学期"
+  },
+  "why_inFlight": {
+    "message": "提交中"
+  },
+  "why_nothingEligible": {
+    "message": "队列中的作业正在等待"
+  },
+  "why_empty": {
+    "message": "队列为空"
+  },
+  "why_atLimit": {
+    "message": "名额已满"
+  },
+  "why_autoOff": {
+    "message": "自动提交未开启"
+  },
+  "why_ok": {
+    "message": "就绪"
+  },
+  "why_error": {
+    "message": "上次检查失败"
+  },
+  "queueNext": {
+    "message": "即将轮到您的作业"
+  },
+  "queueAhead": {
+    "message": "前面还有 $P1$ 份，预计$P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "queueAheadNoEta": {
+    "message": "前面还有 $P1$ 份，暂无预计时间",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "etaMinutes": {
+    "message": "约$P1$分钟",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "etaHours": {
+    "message": "约$P1$小时",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "etaHoursMinutes": {
+    "message": "约$P1$小时$P2$分钟",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "badgeDismiss": {
+    "message": "在此标签页隐藏"
+  },
+  "badgeAssignment": {
+    "message": "当前作业"
+  },
+  "badgeLastNode": {
+    "message": "上次选择的节点"
+  },
+  "badgeNoneYet": {
+    "message": "暂无"
+  },
+  "badgeUnknown": {
+    "message": "不在当前学期中"
+  },
+  "enqueueOnPage": {
+    "message": "加入 Chamber 队列"
+  },
+  "enqueueing": {
+    "message": "正在加入队列……"
+  },
+  "enqueuedOk": {
+    "message": "已加入队列，名额空出时会自动提交，不用再点上面的「提交作业」。"
+  },
+  "enqueuedChained": {
+    "message": "已排在上一节点后面，等上一节点通过后自动提交。"
+  },
+  "enqueueFailed": {
+    "message": "加入队列失败"
+  },
+  "reasonSubmittedElsewhere": {
+    "message": "加入队列后，该节点已在网站上直接提交过。请到网站确认，再决定重试或移除。"
+  },
+  "notifyRevision": {
+    "message": "作业需修改"
+  },
+  "notifyApproved": {
+    "message": "作业已通过"
+  }
+}

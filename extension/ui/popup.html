@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title data-i18n="extName"></title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="zone meter">
+    <div class="meter-top">
+      <div id="pips" class="pips lg"></div>
+      <span id="mode" class="tag" data-tone="accent" hidden></span>
+    </div>
+    <div id="slotsText" class="lg"></div>
+    <div id="meterSub" class="muted"></div>
+  </header>
+
+  <div id="banner" class="zone" hidden>
+    <div class="banner">
+      <span id="bannerText"></span>
+      <button id="bannerAction" type="button" data-i18n="openSite"></button>
+    </div>
+  </div>
+
+  <section id="revisionZone" class="zone" hidden>
+    <h2 class="label accent" data-i18n="needsAttention"></h2>
+    <ul id="revisionList" class="rows"></ul>
+  </section>
+
+  <section id="nowZone" class="zone" hidden>
+    <h2 class="label" data-i18n="nowSubmitting"></h2>
+    <ul id="nowList" class="rows"></ul>
+  </section>
+
+  <section id="reviewZone" class="zone" hidden>
+    <h2 class="label" data-i18n="inReview"></h2>
+    <ul id="reviewList" class="rows"></ul>
+  </section>
+
+  <section id="nextZone" class="zone" hidden>
+    <h2 class="label" data-i18n="nextUp"></h2>
+    <ul id="nextList" class="rows"></ul>
+    <div id="nextMore" class="muted more"></div>
+  </section>
+
+  <section id="emptyZone" class="zone empty" hidden>
+    <p data-i18n="emptyQueue"></p>
+  </section>
+
+  <footer class="zone actions">
+    <button id="pauseBtn" type="button"></button>
+    <button id="openBtn" type="button" class="primary" data-i18n="openQueue"></button>
+  </footer>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

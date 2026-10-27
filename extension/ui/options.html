@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="queuePageTitle"></title>
+  <link rel="icon" href="../icons/32.png">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <div class="brand">
+        <h1 class="lg" data-i18n="extName"></h1>
+        <div id="termLine" class="muted"></div>
+      </div>
+      <div class="meter">
+        <div id="pips" class="pips lg"></div>
+        <div>
+          <div id="slotsText"></div>
+          <div id="whyText" class="muted"></div>
+        </div>
+      </div>
+    </header>
+
+    <div id="banner" class="banner" hidden>
+      <span id="bannerText"></span>
+      <button id="bannerAction" type="button" data-i18n="openSite"></button>
+    </div>
+
+    <section class="controls" aria-labelledby="controlsLabel">
+      <h2 id="controlsLabel" class="label" data-i18n="controls"></h2>
+      <div class="control-row">
+        <button id="pauseBtn" type="button"></button>
+        <label class="switch"><input id="autoSubmit" type="checkbox"><span data-i18n="autoSubmit"></span></label>
+        <label class="switch"><input id="dryRun" type="checkbox"><span data-i18n="dryRun"></span></label>
+        <label class="switch"><span data-i18n="tickEvery"></span>
+          <select id="tickSeconds">
+            <option value="30"></option><option value="60"></option><option value="120"></option><option value="300"></option>
+          </select>
+        </label>
+        <button id="runOnce" type="button" data-i18n="runOnce"></button>
+        <label class="switch"><span data-i18n="language"></span>
+          <select id="locale">
+            <option value="auto" data-i18n="langAuto"></option>
+            <option value="en" data-i18n="langEn"></option>
+            <option value="zh_CN" data-i18n="langZh"></option>
+          </select>
+        </label>
+      </div>
+      <p id="modeHint" class="muted hint"></p>
+    </section>
+
+    <main class="cols">
+      <section class="col backlog" aria-labelledby="backlogLabel">
+        <div class="col-head">
+          <h2 id="backlogLabel" class="label" data-i18n="backlog"></h2>
+          <button id="clearDone" type="button" class="link" data-i18n="clearFinished" hidden></button>
+        </div>
+        <p class="muted hint" data-i18n="reorderHint"></p>
+        <ol id="backlogList" class="rows" aria-labelledby="backlogLabel"></ol>
+        <p id="backlogEmpty" class="muted empty" data-i18n="emptyQueue" hidden></p>
+
+        <h2 class="label section-gap" data-i18n="inReview"></h2>
+        <ul id="reviewList" class="rows"></ul>
+        <p id="reviewEmpty" class="muted empty" data-i18n="noneInReview" hidden></p>
+      </section>
+
+      <section class="col add" aria-labelledby="addLabel">
+        <h2 id="addLabel" class="label" data-i18n="addItem"></h2>
+        <div id="drop" class="drop" tabindex="0" role="button" data-i18n-aria="dropAria">
+          <img id="preview" alt="" hidden>
+          <div id="dropText" class="muted">
+            <div data-i18n="dropHint"></div>
+            <div class="small" data-i18n="dropSub"></div>
+          </div>
+        </div>
+        <input id="file" type="file" accept="image/*" hidden>
+        <div id="fileInfo" class="muted small"></div>
+
+        <div class="picker-head">
+          <input id="search" type="search" data-i18n-placeholder="searchNodes" data-i18n-aria="searchNodes">
+          <label class="switch"><input id="showAll" type="checkbox"><span data-i18n="showAll"></span></label>
+        </div>
+        <div id="picker" class="picker" role="radiogroup" data-i18n-aria="pickNode"></div>
+
+        <div class="add-foot">
+          <div id="addError" class="accent" role="alert"></div>
+          <button id="addBtn" type="button" class="primary" data-i18n="addToQueue" disabled></button>
+        </div>
+      </section>
+    </main>
+
+    <details class="audit">
+      <summary class="label" data-i18n="auditLog"></summary>
+      <ol id="auditList" class="audit-list"></ol>
+    </details>
+  </div>
+  <input id="replaceFile" type="file" accept="image/*" hidden>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

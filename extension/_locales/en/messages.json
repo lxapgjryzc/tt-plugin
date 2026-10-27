@@ -1,0 +1,550 @@
+{
+  "extName": {
+    "message": "Chamber"
+  },
+  "extDescription": {
+    "message": "Queues finished drawings for tenten.art and submits them as review slots free up."
+  },
+  "queuePageTitle": {
+    "message": "Chamber queue"
+  },
+  "slotsFree": {
+    "message": "$P1$ of $P2$ slots free",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "slotsUnknown": {
+    "message": "Slots unknown"
+  },
+  "lastChecked": {
+    "message": "checked $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "agoSeconds": {
+    "message": "$P1$ s ago",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "agoMinutes": {
+    "message": "$P1$ min ago",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "modePaused": {
+    "message": "Paused"
+  },
+  "modeDryRun": {
+    "message": "Dry run"
+  },
+  "modeManual": {
+    "message": "Manual"
+  },
+  "noTab": {
+    "message": "Open tenten.art and log in."
+  },
+  "sessionInvalid": {
+    "message": "Session expired. Open tenten.art and log in again."
+  },
+  "openSite": {
+    "message": "Open tenten.art"
+  },
+  "loadError": {
+    "message": "Could not load: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "needsAttention": {
+    "message": "Needs attention"
+  },
+  "nowSubmitting": {
+    "message": "Now submitting"
+  },
+  "inReview": {
+    "message": "In review"
+  },
+  "noneInReview": {
+    "message": "Nothing waiting for review."
+  },
+  "nextUp": {
+    "message": "Next up"
+  },
+  "nMore": {
+    "message": "… $P1$ more",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "emptyQueue": {
+    "message": "Nothing queued. Drop an image in the queue page."
+  },
+  "pauseAll": {
+    "message": "Pause all"
+  },
+  "resumeAll": {
+    "message": "Resume"
+  },
+  "openQueue": {
+    "message": "Open queue"
+  },
+  "addImage": {
+    "message": "Add an image"
+  },
+  "remove": {
+    "message": "Remove"
+  },
+  "removeItem": {
+    "message": "Remove $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "stopTracking": {
+    "message": "Stop tracking (does not withdraw)"
+  },
+  "controls": {
+    "message": "Controls"
+  },
+  "autoSubmit": {
+    "message": "Auto-submit"
+  },
+  "dryRun": {
+    "message": "Dry run"
+  },
+  "tickEvery": {
+    "message": "Check every"
+  },
+  "seconds": {
+    "message": "$P1$ s",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "language": {
+    "message": "Language"
+  },
+  "langAuto": {
+    "message": "Auto (browser language)"
+  },
+  "langEn": {
+    "message": "English"
+  },
+  "langZh": {
+    "message": "中文"
+  },
+  "runOnce": {
+    "message": "Run one check now"
+  },
+  "hintPaused": {
+    "message": "Paused. Nothing will be uploaded or submitted."
+  },
+  "hintDryRun": {
+    "message": "Dry run: the activity log records what would be submitted; nothing is sent."
+  },
+  "hintAuto": {
+    "message": "Auto-submit is on: queued items go out one at a time as slots free up."
+  },
+  "hintManual": {
+    "message": "Auto-submit is off: use \"Run one check now\" to submit the next item."
+  },
+  "backlog": {
+    "message": "Backlog"
+  },
+  "reorderHint": {
+    "message": "Submitted in this order: earliest deadline, then revisions, then required work. Drag (or Alt+Up / Alt+Down) to reorder within the same priority; Delete removes."
+  },
+  "prioDeadline": {
+    "message": "Due $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "prioRevision": {
+    "message": "Revision"
+  },
+  "prioOptional": {
+    "message": "Optional"
+  },
+  "clearFinished": {
+    "message": "Clear approved"
+  },
+  "moveUp": {
+    "message": "Move up"
+  },
+  "moveDown": {
+    "message": "Move down"
+  },
+  "retry": {
+    "message": "Retry"
+  },
+  "replaceImage": {
+    "message": "Replace image"
+  },
+  "reviewImage": {
+    "message": "Review image $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "addItem": {
+    "message": "Add to queue"
+  },
+  "dropAria": {
+    "message": "Choose, drop or paste an image"
+  },
+  "dropHint": {
+    "message": "Drop, paste or click to choose an image"
+  },
+  "dropSub": {
+    "message": "Up to 10 MB"
+  },
+  "fileInfo": {
+    "message": "$P1$ · $P2$ MB",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "searchNodes": {
+    "message": "Search assignments and nodes"
+  },
+  "showAll": {
+    "message": "Show approved"
+  },
+  "pickNode": {
+    "message": "Target node"
+  },
+  "wholeAssignment": {
+    "message": "Whole assignment"
+  },
+  "chained": {
+    "message": "After previous"
+  },
+  "chainedHint": {
+    "message": "Locked now; it waits until the previous node is approved."
+  },
+  "noMatches": {
+    "message": "No matching nodes."
+  },
+  "loading": {
+    "message": "Loading…"
+  },
+  "pickerUnavailable": {
+    "message": "Cannot load assignments. Open tenten.art and log in."
+  },
+  "addToQueue": {
+    "message": "Add to queue"
+  },
+  "errNoImage": {
+    "message": "Choose an image first."
+  },
+  "errNotImage": {
+    "message": "That file is not an image."
+  },
+  "errEmptyFile": {
+    "message": "That file is empty."
+  },
+  "errTooLarge": {
+    "message": "Image is larger than 10 MB."
+  },
+  "errNoNode": {
+    "message": "Pick a target node."
+  },
+  "auditLog": {
+    "message": "Activity log"
+  },
+  "stQueued": {
+    "message": "Queued"
+  },
+  "stUploading": {
+    "message": "Uploading"
+  },
+  "stSubmitting": {
+    "message": "Submitting"
+  },
+  "stPending": {
+    "message": "Pending"
+  },
+  "stRevision": {
+    "message": "Revision"
+  },
+  "stDone": {
+    "message": "Approved"
+  },
+  "stBlocked": {
+    "message": "Blocked"
+  },
+  "stFailed": {
+    "message": "Failed"
+  },
+  "nsSubmitted": {
+    "message": "Submitted"
+  },
+  "nsReviewing": {
+    "message": "Reviewing"
+  },
+  "nsReviewed": {
+    "message": "Reviewed"
+  },
+  "nsReturned": {
+    "message": "Returned"
+  },
+  "nsShelved": {
+    "message": "Shelved"
+  },
+  "nsApproved": {
+    "message": "Approved"
+  },
+  "nsLocked": {
+    "message": "Locked"
+  },
+  "nsNone": {
+    "message": "Not submitted"
+  },
+  "typeBasic": {
+    "message": "Basic"
+  },
+  "typeExtended": {
+    "message": "Extended"
+  },
+  "typeAdvanced": {
+    "message": "Advanced"
+  },
+  "typeBiWeekly": {
+    "message": "Bi-weekly"
+  },
+  "typeGraduation": {
+    "message": "Graduation"
+  },
+  "typeDrill": {
+    "message": "Drill"
+  },
+  "typeOther": {
+    "message": "Other"
+  },
+  "reasonAssignmentMissing": {
+    "message": "Assignment no longer exists"
+  },
+  "reasonNodeMissing": {
+    "message": "Node no longer exists"
+  },
+  "reasonTermInactive": {
+    "message": "Term is not active"
+  },
+  "reasonClosed": {
+    "message": "Assignment closed or past deadline"
+  },
+  "reasonBlocked": {
+    "message": "Prerequisite not met"
+  },
+  "reasonLocked": {
+    "message": "Node is locked"
+  },
+  "reasonLockedNoChain": {
+    "message": "Locked: queue or submit the previous node first"
+  },
+  "reasonApproved": {
+    "message": "Node already approved"
+  },
+  "reasonPendingOnNode": {
+    "message": "This node is already waiting for review"
+  },
+  "reasonAlreadyQueued": {
+    "message": "Already in the queue"
+  },
+  "reasonNodeChanged": {
+    "message": "The node changed on the platform; check it there"
+  },
+  "reasonInterrupted": {
+    "message": "Interrupted, will continue"
+  },
+  "reasonImageMissing": {
+    "message": "Image missing from local storage"
+  },
+  "reasonTooLarge": {
+    "message": "Image is larger than 10 MB"
+  },
+  "reasonUploadRetry": {
+    "message": "Upload failed, retrying later"
+  },
+  "reasonUploadFailed": {
+    "message": "Upload failed"
+  },
+  "reasonServerRejected": {
+    "message": "Rejected by the platform"
+  },
+  "waitSlot": {
+    "message": "Waiting for a free slot"
+  },
+  "waitTurn": {
+    "message": "Waiting its turn"
+  },
+  "waitLocked": {
+    "message": "Waiting for the previous node to be approved"
+  },
+  "waitNodePending": {
+    "message": "Waiting: this node is under review"
+  },
+  "waitSameNode": {
+    "message": "Waiting for the earlier item on this node"
+  },
+  "waitBackoff": {
+    "message": "Waiting before retrying the upload"
+  },
+  "waitAutoOff": {
+    "message": "Ready. Auto-submit is off"
+  },
+  "why_paused": {
+    "message": "Paused"
+  },
+  "why_sessionInvalid": {
+    "message": "Session expired"
+  },
+  "why_noToken": {
+    "message": "Not logged in"
+  },
+  "why_noTerm": {
+    "message": "No active term"
+  },
+  "why_inFlight": {
+    "message": "Submitting"
+  },
+  "why_nothingEligible": {
+    "message": "Queued items are waiting"
+  },
+  "why_empty": {
+    "message": "Queue empty"
+  },
+  "why_atLimit": {
+    "message": "At the slot limit"
+  },
+  "why_autoOff": {
+    "message": "Auto-submit off"
+  },
+  "why_ok": {
+    "message": "Ready"
+  },
+  "why_error": {
+    "message": "Last check failed"
+  },
+  "queueNext": {
+    "message": "Up next for review"
+  },
+  "queueAhead": {
+    "message": "$P1$ ahead, about $P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "queueAheadNoEta": {
+    "message": "$P1$ ahead, no estimate",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "etaMinutes": {
+    "message": "$P1$ min",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "etaHours": {
+    "message": "$P1$ h",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "etaHoursMinutes": {
+    "message": "$P1$ h $P2$ min",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "badgeDismiss": {
+    "message": "Hide for this tab"
+  },
+  "badgeAssignment": {
+    "message": "This assignment"
+  },
+  "badgeLastNode": {
+    "message": "Last picked node"
+  },
+  "badgeNoneYet": {
+    "message": "None yet"
+  },
+  "badgeUnknown": {
+    "message": "Not found in the active term"
+  },
+  "enqueueOnPage": {
+    "message": "Add to Chamber queue"
+  },
+  "enqueueing": {
+    "message": "Adding to the queue…"
+  },
+  "enqueuedOk": {
+    "message": "Queued. It will be submitted when a slot frees up; no need to press the submit button above."
+  },
+  "enqueuedChained": {
+    "message": "Queued after the previous node. It will be submitted once that node is approved."
+  },
+  "enqueueFailed": {
+    "message": "Could not add to the queue"
+  },
+  "reasonSubmittedElsewhere": {
+    "message": "This node was submitted on the site after you queued it. Check there, then Retry or remove."
+  },
+  "notifyRevision": {
+    "message": "Returned for revision"
+  },
+  "notifyApproved": {
+    "message": "Approved"
+  }
+}

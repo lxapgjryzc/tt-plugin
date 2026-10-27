@@ -183,3 +183,29 @@ test('401 marks the session invalid and pauses scheduling', async () => {
   assert.equal(deps.settingsValue.sessionInvalid, true);
   assert.equal(deps.lock.held, null, 'lock released');
 });
+
+test('queued chain survives a returned first node: later nodes wait, nothing is resubmitted', async () => {
+  const term = makeTerm();
+  const api = fakeServer(term);
+  const n1 = item({ assignmentId: ids.A2, nodeId: ids.A2n1 });
+  const n2 = item({ assignmentId: ids.A2, nodeId: ids.A2n2 });
+  const deps = fakeDeps(api, [n1, n2]);
+  await runTick(deps);
+  assert.equal(api.calls.post, 1, 'node 1 goes out');
+  setStatus(term, ids.A2, ids.A2n1, 'REVIEWED', { teacherFeedback: '重画' });
+  for (let i = 0; i < 3; i++) { deps.advance(60_000); await runTick(deps); }
+  assert.equal(deps.items.get(n1.id).status, 'needs_revision');
+  assert.equal(deps.items.get(n2.id).status, 'queued', 'node 2 keeps waiting (still locked)');
+  assert.equal(deps.snapshots.at(-1).notes[n2.id], 'waitLocked');
+  assert.equal(api.calls.post + api.calls.put, 1, 'nothing else was sent');
+  // user queues a revised node 1 (replaces the item), it goes out as a new round
+  deps.items.set(n1.id, { ...deps.items.get(n1.id), status: 'queued', objectName: null, roundsAtQueue: 1 });
+  deps.advance(60_000); await runTick(deps);
+  assert.equal(api.calls.put, 1, 'revision sent once as PUT');
+  // approved -> node 2 unlocks and goes out
+  setStatus(term, ids.A2, ids.A2n1, 'APPROVED');
+  deps.advance(60_000); await runTick(deps);
+  assert.equal(deps.items.get(n1.id).status, 'done');
+  assert.equal(api.calls.post, 2);
+  assert.equal(deps.items.get(n2.id).status, 'pending');
+});

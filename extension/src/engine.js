@@ -174,7 +174,8 @@ async function tickLocked(deps, settings, { manual, owner }) {
   }
   const method = roundsBefore === 0 ? 'POST' : 'PUT';
 
-  if (!(await store.patchItem(item.id, { status: 'submitting', roundsBefore, submitStartedAt: deps.now() }, 'uploading'))) {
+  // Forget any earlier round this item was tracking: from here on it follows the new one.
+  if (!(await store.patchItem(item.id, { status: 'submitting', roundsBefore, submissionId: null, submitStartedAt: deps.now() }, 'uploading'))) {
     return { why: 'raced' };
   }
 

@@ -410,10 +410,16 @@ function applyPrefill() {
 // ---------------------------------------------------------------------------
 // Automatic login. The page never receives the saved password.
 
+// Set once the user edits the form; background refreshes then leave the fields alone
+// until Save or Forget, so a periodic update cannot wipe what is being typed.
+let loginDirty = false;
+
 function renderLogin(st) {
   if (!st) return;
-  $('loginEnabled').checked = st.enabled;
-  if (document.activeElement !== $('loginAccount')) $('loginAccount').value = st.account;
+  if (!loginDirty) {
+    $('loginEnabled').checked = st.enabled;
+    $('loginAccount').value = st.account;
+  }
   $('loginPassword').placeholder = t(st.hasPassword ? 'loginPasswordSaved' : 'loginPassword');
   $('loginForget').hidden = !st.account && !st.hasPassword;
   let text = t('autoLoginOff');
@@ -432,6 +438,8 @@ async function loadLogin() {
 }
 
 function wire() {
+  $('loginForm').addEventListener('input', () => { loginDirty = true; });
+  $('loginForm').addEventListener('change', () => { loginDirty = true; });
   $('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     $('loginSave').disabled = true;
@@ -443,11 +451,14 @@ function wire() {
     } finally {
       $('loginPassword').value = '';
       $('loginSave').disabled = false;
+      loginDirty = false;
+      loadLogin();
     }
   });
   $('loginForget').addEventListener('click', async () => {
     $('loginPassword').value = '';
     $('loginAccount').value = '';
+    loginDirty = false;
     renderLogin(await send('chamber:forgetLogin'));
   });
 

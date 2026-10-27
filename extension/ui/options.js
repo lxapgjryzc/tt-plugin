@@ -299,24 +299,28 @@ function renderPicker() {
   for (const { lesson, assignment: a } of listAssignments(state.term)) {
     const nodes = (a.nodes || []).length ? a.nodes : [null];
     const rows = [];
+    let anySelectable = false;
     for (const n of nodes) {
       const status = nodeStatus(a, n);
       if (!showAll && status === target.doneStatus) continue;
       if (!matches(q, a.title, n?.title, lesson?.title, lesson?.groupTitle)) continue;
       const ps = pickState(a, n);
+      if (ps.ok) anySelectable = true;
       const nodeId = n ? String(n.nodeId) : null;
       const sel = state.selected?.assignmentId === String(a.assignmentId) && state.selected?.nodeId === nodeId;
       const hint = ps.ok ? (ps.chained ? t('chainedHint') : '') : reasonText(ps.reason, ps.detail);
       const input = el('input', {
         type: 'radio', name: 'node', value: `${a.assignmentId}|${nodeId ?? ''}`, disabled: !ps.ok, checked: sel,
-                onchange: () => { state.selected = { assignmentId: String(a.assignmentId), nodeId }; showAddError(''); updateAddButton(); markSelected(); },
+        onchange: () => { state.selected = { assignmentId: String(a.assignmentId), nodeId }; showAddError(''); updateAddButton(); markSelected(); },
       });
       rows.push(el('label', { class: `node${ps.ok ? '' : ' disabled'}${sel ? ' selected' : ''}`, title: hint || null, 'data-key': `${a.assignmentId}|${nodeId ?? ''}` },
         input,
         el('span', { class: 'node-title', text: n ? n.title || `#${n.nodeOrder}` : t('wholeAssignment') }),
         ps.chained ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('chained') }) : nodeTag(status, n?.locked)));
     }
-    if (!rows.length) continue;
+    // By default, hide assignments where nothing can be queued right now (closed,
+    // prerequisite missing, every open node locked or already queued), like approved nodes.
+    if (!rows.length || (!showAll && !anySelectable)) continue;
     const note = a.blockedReason ? String(a.blockedReason) : a.status === 'CLOSED' ? t('reasonClosed') : null;
     groups.push(el('div', { class: 'group' },
       el('div', { class: 'group-head' },
@@ -402,6 +406,8 @@ function applyPrefill() {
   const n = q.get('n');
   const node = n ? findNode(assignment, n) : (assignment.nodes || []).find((x) => pickState(assignment, x).ok);
   if (node && pickState(assignment, node).ok) state.selected = { assignmentId: String(assignment.assignmentId), nodeId: String(node.nodeId) };
+  // Opened from an assignment where nothing can be queued: show it anyway, with the reasons.
+  else $('showAll').checked = true;
   renderPicker();
   document.querySelector('.node.selected')?.scrollIntoView({ block: 'nearest' });
   history.replaceState(null, '', location.pathname);

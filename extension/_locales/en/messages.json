@@ -241,7 +241,7 @@
     "message": "Search assignments and nodes"
   },
   "showAll": {
-    "message": "Show approved"
+    "message": "Show all"
   },
   "pickNode": {
     "message": "Target node"

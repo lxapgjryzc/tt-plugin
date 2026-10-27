@@ -66,7 +66,7 @@ export default [
   ['dropSub', 'Up to 10 MB', '最大 10 MB'],
   ['fileInfo', '$1 · $2 MB', '$1 · $2 MB'],
   ['searchNodes', 'Search assignments and nodes', '搜索作业和节点'],
-  ['showAll', 'Show approved', '显示已通过'],
+  ['showAll', 'Show all', '显示全部'],
   ['pickNode', 'Target node', '目标节点'],
   ['wholeAssignment', 'Whole assignment', '整个作业'],
   ['chained', 'After previous', '排在上一节点后'],

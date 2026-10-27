@@ -1,0 +1,10 @@
+{
+  "name": "chamber",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "locales": "node tools/build-locales.mjs",
+    "icons": "node tools/make-icons.mjs"
+  }
+}

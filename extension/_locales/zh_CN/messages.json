@@ -144,6 +144,26 @@
       }
     }
   },
+  "reviewHoursOn": {
+    "message": "只在批改时间检查"
+  },
+  "reviewHoursHint": {
+    "message": "北京时间，即助教批改的时间。其余时间暂停定时检查（每段结束后再继续 30 分钟）。添加图片、打开弹窗或点「立即检查一次」仍会立即检查。"
+  },
+  "reviewHoursLocal": {
+    "message": "你的本地时间：$P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "reviewHoursInvalid": {
+    "message": "请按 10:00-15:00, 18:00-23:00 的格式填写"
+  },
+  "why_restHours": {
+    "message": "助教休息中，暂停检查"
+  },
   "language": {
     "message": "语言"
   },

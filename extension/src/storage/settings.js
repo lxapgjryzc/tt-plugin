@@ -1,5 +1,7 @@
 // chrome.storage wrappers. Keys are prefixed `chamber:`.
 
+import { DEFAULT_REVIEW_HOURS } from '../review-hours.js';
+
 export const KEYS = {
   settings: 'chamber:settings',
   audit: 'chamber:audit',
@@ -22,6 +24,8 @@ export const DEFAULTS = {
   sessionInvalid: false,
   locale: 'auto', // 'auto' follows the browser; or 'en' / 'zh_CN'
   autoLogin: false, // log in with the saved password when the session runs out
+  reviewHoursOn: true, // skip the periodic check while TAs are off duty
+  reviewHours: DEFAULT_REVIEW_HOURS, // Beijing time
 };
 
 export const MIN_TICK = 30;

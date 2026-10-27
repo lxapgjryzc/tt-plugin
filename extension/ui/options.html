@@ -49,6 +49,13 @@
           </select>
         </label>
       </div>
+      <div class="control-row">
+        <label class="switch"><input id="reviewHoursOn" type="checkbox"><span data-i18n="reviewHoursOn"></span></label>
+        <input id="reviewHours" type="text" spellcheck="false" data-i18n-aria="reviewHoursOn">
+        <span id="reviewHoursLocal" class="muted"></span>
+      </div>
+      <p id="reviewHoursError" class="accent hint" role="alert"></p>
+      <p class="muted hint small" data-i18n="reviewHoursHint"></p>
       <p id="modeHint" class="muted hint"></p>
     </section>
 

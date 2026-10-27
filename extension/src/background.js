@@ -10,6 +10,7 @@ import { loadMessages, format, PAGE_LOCALE } from './i18n.js';
 import { getToken, storeToken, usable } from './token-bridge.js';
 import { sessionState, tokenExpiry } from './session.js';
 import { tryAutoLogin, autoLoginActive, loginStatus, saveLogin, forgetLogin } from './auto-login.js';
+import { parseReviewHours, inReviewHours } from './review-hours.js';
 import * as store from './storage/idb.js';
 import {
   KEYS, getSettings, setSettings, appendAudit, getAudit, acquireLock, refreshLock, releaseLock,
@@ -359,7 +360,21 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   return true;
 });
 
-chrome.alarms.onAlarm.addListener((a) => { if (a.name === ALARM) tick(); });
+// Periodic checks pause while TAs are off duty: no review means no slot can free up.
+// Only the alarm is affected; checks triggered by the user (adding an image, opening
+// the popup, Run one check now, visiting the site) still run, so a free slot is used.
+chrome.alarms.onAlarm.addListener(async (a) => {
+  if (a.name !== ALARM) return;
+  const s = await getSettings();
+  if (s.reviewHoursOn && !inReviewHours(parseReviewHours(s.reviewHours))) {
+    const { [KEYS.snapshot]: snap } = await chrome.storage.local.get(KEYS.snapshot);
+    if (snap && snap.why !== 'restHours') await chrome.storage.local.set({ [KEYS.snapshot]: { ...snap, why: 'restHours' } });
+    await refreshBadge();
+    await checkSession();
+    return;
+  }
+  tick();
+});
 chrome.runtime.onInstalled.addListener(() => { ensureAlarm(); tickSoon(500); });
 chrome.runtime.onStartup.addListener(() => { ensureAlarm(); tickSoon(500); });
 ensureAlarm();

@@ -144,6 +144,26 @@
       }
     }
   },
+  "reviewHoursOn": {
+    "message": "Only check during review hours"
+  },
+  "reviewHoursHint": {
+    "message": "Beijing time, when TAs review. Outside these hours the regular check pauses (it keeps going for 30 minutes after each window). Adding an image, opening the popup or Run one check now still checks right away."
+  },
+  "reviewHoursLocal": {
+    "message": "Your time: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "reviewHoursInvalid": {
+    "message": "Use the form 10:00-15:00, 18:00-23:00"
+  },
+  "why_restHours": {
+    "message": "TAs off duty, checks paused"
+  },
   "language": {
     "message": "Language"
   },

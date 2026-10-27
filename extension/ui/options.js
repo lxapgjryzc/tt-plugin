@@ -6,6 +6,7 @@ import { KEYS, getSettings, getAudit } from '../src/storage/settings.js';
 import { target } from '../src/target.js';
 import { listAssignments, findAssignment, findNode, nodeStatus, nodeSubmissions, label } from '../src/model.js';
 import { prioritize, priorityOf, canQueue } from '../src/scheduler.js';
+import { parseReviewHours } from '../src/review-hours.js';
 
 const $ = (id) => document.getElementById(id);
 const TREE_TTL = 30_000;
@@ -78,6 +79,10 @@ function renderHeader() {
   $('dryRun').checked = settings.dryRun;
   $('tickSeconds').value = String(settings.tickSeconds);
   $('locale').value = settings.locale;
+  $('reviewHoursOn').checked = settings.reviewHoursOn;
+  if (document.activeElement !== $('reviewHours')) $('reviewHours').value = settings.reviewHours;
+  $('reviewHours').disabled = !settings.reviewHoursOn;
+  $('reviewHoursLocal').textContent = localReviewHours(settings.reviewHours);
   const hint = settings.paused ? 'hintPaused' : settings.dryRun ? 'hintDryRun' : settings.autoSubmit ? 'hintAuto' : 'hintManual';
   $('modeHint').textContent = t(hint);
   $('runOnce').disabled = settings.paused;
@@ -413,6 +418,16 @@ function applyPrefill() {
   history.replaceState(null, '', location.pathname);
 }
 
+// Review hours are in Beijing time; show them in the user's own time as well.
+function localReviewHours(text) {
+  const windows = parseReviewHours(text);
+  if (!windows || new Date().getTimezoneOffset() === -480) return '';
+  const day = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10); // today in Beijing
+  const at = (min) => new Date(Date.parse(`${day}T00:00:00+08:00`) + min * 60_000)
+    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return t('reviewHoursLocal', [windows.map(([s, e]) => `${at(s)}–${at(e)}`).join(', ')]);
+}
+
 // ---------------------------------------------------------------------------
 // Automatic login. The page never receives the saved password.
 
@@ -474,6 +489,16 @@ function wire() {
   $('autoSubmit').addEventListener('change', (e) => send('chamber:settings', { patch: { autoSubmit: e.target.checked } }));
   $('dryRun').addEventListener('change', (e) => send('chamber:settings', { patch: { dryRun: e.target.checked } }));
   $('tickSeconds').addEventListener('change', (e) => send('chamber:settings', { patch: { tickSeconds: Number(e.target.value) } }));
+  $('reviewHoursOn').addEventListener('change', (e) => send('chamber:settings', { patch: { reviewHoursOn: e.target.checked } }));
+  $('reviewHours').addEventListener('change', (e) => {
+    const text = e.target.value.trim();
+    if (!parseReviewHours(text)) {
+      $('reviewHoursError').textContent = t('reviewHoursInvalid');
+      return;
+    }
+    $('reviewHoursError').textContent = '';
+    send('chamber:settings', { patch: { reviewHours: text } });
+  });
   $('locale').addEventListener('change', async (e) => {
     await send('chamber:settings', { patch: { locale: e.target.value } });
     location.reload();

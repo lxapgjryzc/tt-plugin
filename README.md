@@ -12,7 +12,10 @@ The extension UI is in English, with Chinese available as an optional language (
 
 ### Staying logged in
 
-The site's login token is valid for exactly 24 hours and the site has no way to refresh it, so you have to log in again once a day. The extension reminds you: a notification about an hour before it expires, and a persistent one (plus a red **!** on the toolbar icon) once it has. Click it to open the site and log in; queued drawings simply wait meanwhile and the extension resumes on its own.
+The site's login token is valid for exactly 24 hours and the site has no way to refresh it. Two options:
+
+- **Reminders (default).** A notification about an hour before the login expires, and a persistent one (plus a red **!** on the toolbar icon) once it has. Click it to open the site and log in; queued drawings wait meanwhile and the extension resumes on its own.
+- **Automatic login (opt-in).** Queue page → **Automatic login**: tick it, enter your phone or email and password, **Save**. The extension then logs in with the site's password login (it has no captcha) whenever the session is about to run out, and also restores the site's own login when you open it. If the site refuses the password, it stops and notifies you instead of retrying, so a wrong password cannot get the account locked; network errors are retried at most every 10 minutes. **The password is stored unencrypted** in this Chrome profile (`chrome.storage.local`), readable only by this extension, never logged, never exposed to the site page, and sent only to `tenten.art/api/auth/password/login`. **Forget account** removes it.
 4. Click the toolbar icon → **Open queue**.
 
 After pulling new code, click the reload button on the extension's card in `chrome://extensions`, then refresh any open tenten.art tab.
@@ -60,6 +63,7 @@ Verified against the live API and the site's front-end bundle. Keep this table u
 |---|---|
 | Auth | `localStorage["tenten-auth"].token`, sent as `Authorization: Bearer <token>` |
 | Session | The token is an HS512 JWT with a fixed 24 h lifetime (`exp`). There is no refresh endpoint; on 401 the site just logs out |
+| Login | `POST /api/auth/password/login` `{ account, password }` → session object (`token`, `userId`, `displayName`, `roles`, …), stored by the site as `localStorage["tenten-auth"]`. No captcha on this endpoint (the slider captcha only guards sending SMS / email codes) |
 | CORS | Any request with `Origin: chrome-extension://…` gets `403 Invalid CORS request`. Chrome omits Origin on the worker's GETs but sends it on POST/PUT, so a declarativeNetRequest session rule strips Origin from the worker's requests (pages are unaffected) |
 | Main data | `GET /api/student/courses/terms/{termId}/weeks` returns the whole assignment tree and `maxPendingSubmissions` |
 | Slot count | Submissions in `SUBMITTED` / `REVIEWING` take a slot. The site counts the last round per assignment; the extension counts the last round per node (can only over-count) |

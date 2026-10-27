@@ -19,6 +19,7 @@ export function makePaths(target) {
     courses: () => `${api}/student/courses`,
     weeks: (termId) => `${api}/student/courses/terms/${encodeURIComponent(termId)}/weeks`,
     upload: () => `${api}/files/upload`,
+    login: () => `${api}/auth/password/login`,
     submissions: (assignmentId) => `${api}/student/assignments/${encodeURIComponent(assignmentId)}/submissions`,
   };
 }
@@ -29,9 +30,9 @@ export function makeApi(target, { fetchImpl = (...a) => fetch(...a), uploadRetry
   const paths = makePaths(target);
   let token = null;
 
-  async function request(method, url, body) {
-    if (!token) throw new ApiError(401, null, 'NO_TOKEN');
-    const headers = { Authorization: `Bearer ${token}` };
+  async function request(method, url, body, { auth = true } = {}) {
+    if (auth && !token) throw new ApiError(401, null, 'NO_TOKEN');
+    const headers = auth ? { Authorization: `Bearer ${token}` } : {};
     let payload;
     if (body instanceof FormData) payload = body;
     else if (body !== undefined) {
@@ -65,6 +66,10 @@ export function makeApi(target, { fetchImpl = (...a) => fetch(...a), uploadRetry
     setToken: (t) => { token = t || null; },
     hasToken: () => !!token,
     clearToken: () => { token = null; },
+
+    // Password login (the site shows no captcha for it). Resolves with the session
+    // object: { token, userId, displayName, role, roles, ... }.
+    login: (account, password) => request('POST', paths.login(), { account, password }, { auth: false }),
 
     courses: () => request('GET', paths.courses()),
     weeks: (termId) => request('GET', paths.weeks(termId)),

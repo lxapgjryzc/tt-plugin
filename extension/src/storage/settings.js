@@ -8,6 +8,9 @@ export const KEYS = {
   token: 'chamber:token', // the site's bearer token (local storage, survives restarts)
   lastTick: 'chamber:lastTick',
   sessionNotice: 'chamber:sessionNotice', // which login notification was last shown
+  credentials: 'chamber:credentials', // { account, password } for automatic login (opt-in)
+  autoLoginState: 'chamber:autoLoginState', // result of the last automatic login
+  siteSession: 'chamber:siteSession', // session object from the last automatic login, for the site
 };
 
 export const DEFAULTS = {
@@ -18,6 +21,7 @@ export const DEFAULTS = {
   tickSeconds: 60,
   sessionInvalid: false,
   locale: 'auto', // 'auto' follows the browser; or 'en' / 'zh_CN'
+  autoLogin: false, // log in with the saved password when the session runs out
 };
 
 export const MIN_TICK = 30;

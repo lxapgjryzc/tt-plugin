@@ -15,7 +15,7 @@
 .control-row { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 2); align-items: center; margin-top: var(--u); }
 .switch { display: inline-flex; gap: var(--u); align-items: center; cursor: pointer; }
 .switch input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--fg); }
-select, input[type="search"] {
+select, input[type="search"], input[type="text"], input[type="password"] {
   font: inherit; color: var(--fg); background: var(--bg);
   border: 1px solid var(--line); border-radius: var(--radius); padding: 4px var(--u); min-height: 32px;
 }

@@ -558,6 +558,77 @@
       }
     }
   },
+  "autoLogin": {
+    "message": "自动登录"
+  },
+  "autoLoginEnable": {
+    "message": "自动登录"
+  },
+  "loginAccount": {
+    "message": "手机号或邮箱"
+  },
+  "loginPassword": {
+    "message": "密码"
+  },
+  "loginPasswordSaved": {
+    "message": "密码已保存"
+  },
+  "loginSave": {
+    "message": "保存"
+  },
+  "loginForget": {
+    "message": "清除账号"
+  },
+  "autoLoginSaving": {
+    "message": "正在保存并登录……"
+  },
+  "autoLoginOff": {
+    "message": "已关闭。24 小时登录到期时会提醒你重新登录。"
+  },
+  "autoLoginNeedCreds": {
+    "message": "请填写账号和密码，然后保存。"
+  },
+  "autoLoginReady": {
+    "message": "已开启，登录快到期时会自动重新登录。"
+  },
+  "autoLoginOk": {
+    "message": "已开启。上次自动登录：$P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLoginFailed": {
+    "message": "自动登录失败：$P1$。10 分钟后会再试。",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLoginRejected": {
+    "message": "网站拒绝了登录：$P1$。请修改账号或密码后重新保存，在此之前不会再尝试。",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLoginHint": {
+    "message": "开启后，24 小时登录到期时扩展会用这个密码自动登录 tenten.art，并恢复网站本身的登录状态。密码以明文保存在本 Chrome 配置文件中，只有本扩展能读取，且只会发送给 tenten.art。密码留空则保持不变。"
+  },
+  "notifyAutoLoginFailedTitle": {
+    "message": "自动登录失败"
+  },
+  "notifyAutoLoginFailedBody": {
+    "message": "$P1$。点击查看设置。",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "notifyRevision": {
     "message": "作业需修改"
   },

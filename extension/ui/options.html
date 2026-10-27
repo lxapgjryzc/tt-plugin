@@ -52,6 +52,19 @@
       <p id="modeHint" class="muted hint"></p>
     </section>
 
+    <section class="controls" aria-labelledby="loginLabel">
+      <h2 id="loginLabel" class="label" data-i18n="autoLogin"></h2>
+      <form id="loginForm" class="control-row" autocomplete="on">
+        <label class="switch"><input id="loginEnabled" type="checkbox"><span data-i18n="autoLoginEnable"></span></label>
+        <input id="loginAccount" type="text" autocomplete="username" data-i18n-placeholder="loginAccount" data-i18n-aria="loginAccount">
+        <input id="loginPassword" type="password" autocomplete="current-password" data-i18n-aria="loginPassword">
+        <button id="loginSave" type="submit" data-i18n="loginSave"></button>
+        <button id="loginForget" type="button" class="link" data-i18n="loginForget"></button>
+      </form>
+      <p id="loginStatus" class="hint" role="status"></p>
+      <p class="muted hint small" data-i18n="autoLoginHint"></p>
+    </section>
+
     <main class="cols">
       <section class="col backlog" aria-labelledby="backlogLabel">
         <div class="col-head">

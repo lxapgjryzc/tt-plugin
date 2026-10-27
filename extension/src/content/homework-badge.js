@@ -20,6 +20,34 @@
     return entry.message.replace(/\$P(\d)\$/g, (_, n) => list[Number(n) - 1] ?? '');
   };
 
+  // Seconds-precision JWT expiry check (same rule as src/session.js).
+  function tokenUsable(token) {
+    const part = typeof token === 'string' ? token.split('.')[1] : null;
+    if (!part) return !!token;
+    try {
+      const exp = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '=')))?.exp;
+      return !Number.isFinite(exp) || exp * 1000 > Date.now();
+    } catch {
+      return true;
+    }
+  }
+
+  // With automatic login on, put its session into the site's own storage when the
+  // site's login has run out, then reload so the site picks it up. Once per session.
+  async function restoreSiteLogin() {
+    let page = null;
+    try { page = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch { /* ignore */ }
+    if (page?.token && tokenUsable(page.token)) return;
+    const session = await send({ type: 'chamber:siteSession' });
+    if (!session?.token || !tokenUsable(session.token)) return;
+    const guard = `chamber-restored:${session.token.slice(-24)}`;
+    if (sessionStorage.getItem(guard)) return;
+    sessionStorage.setItem(guard, '1');
+    localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+    if (location.pathname.startsWith('/login')) location.replace('/');
+    else location.reload();
+  }
+
   let lastToken;
   function syncToken() {
     let token = null;
@@ -254,6 +282,7 @@
     if (location.pathname === lastPath) return;
     if (enq) showNote('', false);
     lastPath = location.pathname;
+    restoreSiteLogin();
     send({ type: 'chamber:pageNav' });
     const m = ROUTE.exec(location.pathname);
     if (m) render(m[1]);

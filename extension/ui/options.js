@@ -382,7 +382,7 @@ async function renderAudit() {
 // ---------------------------------------------------------------------------
 
 async function refresh({ tree = false } = {}) {
-  await Promise.all([loadLocal(), loadTree(tree)]);
+  await Promise.all([loadLocal(), loadTree(tree), loadLogin()]);
   // Show the backlog in the order the scheduler will actually use.
   if (state.term) state.backlog = prioritize(target, state.term, state.backlog).map((r) => r.item);
   renderHeader();
@@ -407,7 +407,50 @@ function applyPrefill() {
   history.replaceState(null, '', location.pathname);
 }
 
+// ---------------------------------------------------------------------------
+// Automatic login. The page never receives the saved password.
+
+function renderLogin(st) {
+  if (!st) return;
+  $('loginEnabled').checked = st.enabled;
+  if (document.activeElement !== $('loginAccount')) $('loginAccount').value = st.account;
+  $('loginPassword').placeholder = t(st.hasPassword ? 'loginPasswordSaved' : 'loginPassword');
+  $('loginForget').hidden = !st.account && !st.hasPassword;
+  let text = t('autoLoginOff');
+  let error = false;
+  if (st.enabled && !st.hasPassword) text = t('autoLoginNeedCreds');
+  else if (st.enabled && st.error) { text = t(st.rejected ? 'autoLoginRejected' : 'autoLoginFailed', [st.error]); error = true; }
+  else if (st.enabled && st.ok) text = t('autoLoginOk', [new Date(st.at).toLocaleString()]);
+  else if (st.enabled) text = t('autoLoginReady');
+  $('loginStatus').textContent = text;
+  $('loginStatus').classList.toggle('accent', error);
+  $('loginStatus').classList.toggle('muted', !error);
+}
+
+async function loadLogin() {
+  renderLogin(await send('chamber:loginStatus'));
+}
+
 function wire() {
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('loginSave').disabled = true;
+    $('loginStatus').textContent = t('autoLoginSaving');
+    try {
+      renderLogin(await send('chamber:saveLogin', {
+        enabled: $('loginEnabled').checked, account: $('loginAccount').value, password: $('loginPassword').value,
+      }));
+    } finally {
+      $('loginPassword').value = '';
+      $('loginSave').disabled = false;
+    }
+  });
+  $('loginForget').addEventListener('click', async () => {
+    $('loginPassword').value = '';
+    $('loginAccount').value = '';
+    renderLogin(await send('chamber:forgetLogin'));
+  });
+
   for (const opt of $('tickSeconds').options) opt.textContent = t('seconds', [opt.value]);
 
   $('pauseBtn').addEventListener('click', () => send('chamber:settings', { patch: { paused: !state.settings.paused } }));

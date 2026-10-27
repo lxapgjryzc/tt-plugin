@@ -9,6 +9,7 @@ import { canQueue } from './scheduler.js';
 import { loadMessages, format, PAGE_LOCALE } from './i18n.js';
 import { getToken, storeToken, usable } from './token-bridge.js';
 import { sessionState, tokenExpiry } from './session.js';
+import { tryAutoLogin, autoLoginActive, loginStatus, saveLogin, forgetLogin } from './auto-login.js';
 import * as store from './storage/idb.js';
 import {
   KEYS, getSettings, setSettings, appendAudit, getAudit, acquireLock, refreshLock, releaseLock,
@@ -27,7 +28,12 @@ const deps = {
     await appendAudit(entry);
     if (entry.action === 'reconcile') notifyTransition(entry);
   },
-  getToken,
+  // With automatic login on, a missing, expired or soon-expiring token triggers a login.
+  getToken: async ({ fresh } = {}) => {
+    const token = await getToken({ fresh });
+    if (sessionState({ token }) === 'ok') return token;
+    return (await tryAutoLogin(api)) || token;
+  },
   dropToken: () => storeToken(null),
   saveSnapshot: (snap) => chrome.storage.local.set({ [KEYS.snapshot]: snap }),
   now: () => Date.now(),
@@ -136,7 +142,10 @@ async function checkSession() {
   const { [KEYS.token]: token, [KEYS.sessionNotice]: shown } = await chrome.storage.local.get([KEYS.token, KEYS.sessionNotice]);
   const state = sessionState({ token, sessionInvalid: s.sessionInvalid });
   const exp = tokenExpiry(token);
-  const notice = state === 'expiring' ? `expiring:${exp}` : state === 'ok' ? null : 'loggedOut';
+  let notice = state === 'expiring' ? `expiring:${exp}` : state === 'ok' ? null : 'loggedOut';
+  // Automatic login handles it; only speak up if it is off or failing.
+  if (notice && await autoLoginActive()) notice = null;
+  const failed = notice === 'loggedOut' && s.autoLogin ? (await loginStatus()).error : null;
   if (notice === (shown ?? null)) return;
   if (!notice) {
     await chrome.storage.local.remove(KEYS.sessionNotice);
@@ -149,8 +158,10 @@ async function checkSession() {
   chrome.notifications.create(LOGIN_NOTE, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/128.png'),
-    title: format(messages, notice === 'loggedOut' ? 'notifyLoggedOutTitle' : 'notifyExpiringTitle'),
-    message: format(messages, notice === 'loggedOut' ? 'notifyLoggedOutBody' : 'notifyExpiringBody', [time]),
+    title: format(messages, failed ? 'notifyAutoLoginFailedTitle' : notice === 'loggedOut' ? 'notifyLoggedOutTitle' : 'notifyExpiringTitle'),
+    message: failed
+      ? format(messages, 'notifyAutoLoginFailedBody', [failed])
+      : format(messages, notice === 'loggedOut' ? 'notifyLoggedOutBody' : 'notifyExpiringBody', [time]),
     requireInteraction: notice === 'loggedOut',
   });
 }
@@ -168,9 +179,10 @@ async function notifyTransition(entry) {
   });
 }
 
-chrome.notifications.onClicked.addListener((id) => {
+chrome.notifications.onClicked.addListener(async (id) => {
   chrome.notifications.clear(id);
-  if (id === LOGIN_NOTE) chrome.tabs.create({ url: `${target.base}/` });
+  // A failed automatic login is fixed on the settings page; otherwise log in on the site.
+  if (id === LOGIN_NOTE && !(await getSettings()).autoLogin) chrome.tabs.create({ url: `${target.base}/` });
   else openQueue();
 });
 
@@ -233,15 +245,54 @@ self.chamber = { probe, tick, getAudit, getSettings, setSettings, listBacklog: s
 const handlers = {
   'chamber:token': async ({ token }, sender) => {
     if (!sender.url?.startsWith(target.base)) return { ok: false };
-    // The site may still hold an expired token until its next API call logs it out.
-    const next = usable(token) ? token : null;
     const prev = (await chrome.storage.local.get(KEYS.token))[KEYS.token];
-    if (next === prev) return { ok: true };
-    await storeToken(next);
-    if (next) tickSoon(); // a fresh login: resume (the tick clears sessionInvalid)
+    if (token === prev) return { ok: true };
+    if (usable(token)) {
+      // Adopt the page's token unless ours is still good and lasts longer (e.g. the page
+      // holds yesterday's token while automatic login already got a new one).
+      if (usable(prev) && (tokenExpiry(prev) ?? 0) >= (tokenExpiry(token) ?? 0)) return { ok: true };
+      await storeToken(token);
+      tickSoon(); // a fresh login: resume (the tick clears sessionInvalid)
+    } else if (!token && !(await getSettings()).autoLogin) {
+      // Logged out on the site: forget our copy too. (An expired token on the page
+      // is just ignored; with automatic login on, we keep our own session.)
+      await storeToken(null);
+    } else {
+      return { ok: true };
+    }
     await refreshBadge();
     await checkSession();
     return { ok: true };
+  },
+  // The site page asks for the session obtained by automatic login, to restore its
+  // own login when it has expired. Only answered while automatic login is on.
+  'chamber:siteSession': async (_msg, sender) => {
+    if (!sender.url?.startsWith(target.base)) return null;
+    if (!(await getSettings()).autoLogin) return null;
+    const { [KEYS.siteSession]: session } = await chrome.storage.local.get(KEYS.siteSession);
+    return session && usable(session.token) ? session : null;
+  },
+  // Settings page only (never content scripts): status without the password, save, forget.
+  'chamber:loginStatus': async (_msg, sender) => (fromExtensionPage(sender) ? loginStatus() : null),
+  'chamber:saveLogin': async ({ enabled, account, password }, sender) => {
+    if (!fromExtensionPage(sender)) return null;
+    await saveLogin({ enabled, account, password });
+    if (enabled) {
+      const token = await tryAutoLogin(api, { force: true });
+      if (token) tickSoon(300);
+    }
+    await refreshBadge();
+    await checkSession();
+    broadcast();
+    return loginStatus();
+  },
+  'chamber:forgetLogin': async (_msg, sender) => {
+    if (!fromExtensionPage(sender)) return null;
+    await forgetLogin();
+    await refreshBadge();
+    await checkSession();
+    broadcast();
+    return loginStatus();
   },
   'chamber:pageNav': async () => { tickSoon(); return { ok: true }; },
   // tenten.art is Chinese-only, so everything injected into it uses PAGE_LOCALE.
@@ -296,6 +347,10 @@ const handlers = {
     return a ? { title: a.title, nodes: (a.nodes || []).map((n) => ({ nodeId: n.nodeId, title: n.title, status: n.status, locked: n.locked })) } : { error: 'NOT_FOUND' };
   },
 };
+
+function fromExtensionPage(sender) {
+  return sender.id === chrome.runtime.id && sender.url?.startsWith(chrome.runtime.getURL(''));
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   const h = handlers[msg?.type];

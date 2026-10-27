@@ -558,6 +558,77 @@
       }
     }
   },
+  "autoLogin": {
+    "message": "Automatic login"
+  },
+  "autoLoginEnable": {
+    "message": "Log in automatically"
+  },
+  "loginAccount": {
+    "message": "Phone or email"
+  },
+  "loginPassword": {
+    "message": "Password"
+  },
+  "loginPasswordSaved": {
+    "message": "Password saved"
+  },
+  "loginSave": {
+    "message": "Save"
+  },
+  "loginForget": {
+    "message": "Forget account"
+  },
+  "autoLoginSaving": {
+    "message": "Saving and logging in…"
+  },
+  "autoLoginOff": {
+    "message": "Off. You will be reminded to log in when the 24-hour session runs out."
+  },
+  "autoLoginNeedCreds": {
+    "message": "Enter your account and password, then Save."
+  },
+  "autoLoginReady": {
+    "message": "On. It will log in when the session is about to run out."
+  },
+  "autoLoginOk": {
+    "message": "On. Last automatic login: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLoginFailed": {
+    "message": "Automatic login failed: $P1$. It will try again in 10 minutes.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLoginRejected": {
+    "message": "The site refused the login: $P1$. Fix the account or password and Save again; it will not retry until then.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLoginHint": {
+    "message": "When on, the extension logs in to tenten.art with this password whenever the 24-hour session runs out, and restores the site's own login too. The password is stored unencrypted in this Chrome profile, readable only by this extension, and is sent only to tenten.art. Leave the password empty to keep the saved one."
+  },
+  "notifyAutoLoginFailedTitle": {
+    "message": "Automatic login failed"
+  },
+  "notifyAutoLoginFailedBody": {
+    "message": "$P1$. Click to check the settings.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "notifyRevision": {
     "message": "Returned for revision"
   },

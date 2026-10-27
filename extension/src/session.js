@@ -19,6 +19,20 @@ export function tokenExpiry(token) {
   }
 }
 
+// Fields the site keeps in localStorage["tenten-auth"] (as its own login does).
+export const SITE_SESSION_FIELDS = [
+  'token', 'userId', 'displayName', 'role', 'roles', 'mobile', 'mobileBound', 'email', 'emailBound',
+  'profileCompleted', 'passwordSet', 'avatarUrl', 'studentNo',
+];
+
+export function siteSessionFrom(data) {
+  const out = {};
+  for (const k of SITE_SESSION_FIELDS) out[k] = data?.[k] ?? null;
+  out.roles = Array.isArray(data?.roles) ? data.roles : [];
+  out.avatarUrl = data?.avatarUrl || '';
+  return out;
+}
+
 // 'ok' | 'expiring' | 'expired' | 'missing' | 'invalid'
 export function sessionState({ token, sessionInvalid }, now = Date.now()) {
   if (sessionInvalid) return 'invalid';

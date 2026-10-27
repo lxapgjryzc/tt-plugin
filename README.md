@@ -8,7 +8,7 @@ The extension UI is in English, with Chinese available as an optional language (
 
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and select the `extension/` folder of this repo.
-3. Open https://tenten.art and log in. The extension picks up the session from the page and keeps working after you close the tab (after a browser restart, open the site once again).
+3. Open https://tenten.art and log in once. The extension picks up the session from the page and keeps it, so it keeps working after you close the tab and after a browser restart. You only need to visit the site again if the session expires or you log out (the popup will say so).
 4. Click the toolbar icon → **Open queue**.
 
 After pulling new code, click the reload button on the extension's card in `chrome://extensions`, then refresh any open tenten.art tab.

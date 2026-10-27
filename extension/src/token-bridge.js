@@ -1,7 +1,9 @@
 // Bearer token acquisition.
-// 1. The content script pushes the token into chrome.storage.session whenever a
-//    tenten.art page loads, so ticks keep working after the tab is closed.
-// 2. If asked for a fresh token (after a 401) or nothing is cached, read it straight
+// 1. The content script pushes the token into chrome.storage.local whenever a
+//    tenten.art page loads, so checks keep working after the tab is closed and after a
+//    browser restart. The site itself keeps the same token in its localStorage, so
+//    this adds no exposure; logging out on the site clears our copy too.
+// 2. If asked for a fresh token (after a 401) or nothing is stored, read it straight
 //    from an open tab via chrome.scripting.
 
 import { target } from './target.js';
@@ -31,8 +33,8 @@ async function readFromTab() {
 
 export async function storeToken(token) {
   mem = { token: token || null, at: Date.now() };
-  if (token) await chrome.storage.session.set({ [KEYS.token]: token });
-  else await chrome.storage.session.remove(KEYS.token);
+  if (token) await chrome.storage.local.set({ [KEYS.token]: token });
+  else await chrome.storage.local.remove(KEYS.token);
 }
 
 export async function getToken({ fresh = false } = {}) {
@@ -43,7 +45,7 @@ export async function getToken({ fresh = false } = {}) {
     return live;
   }
   if (fresh) return null;
-  const { [KEYS.token]: cached } = await chrome.storage.session.get(KEYS.token);
+  const { [KEYS.token]: cached } = await chrome.storage.local.get(KEYS.token);
   if (cached) mem = { token: cached, at: Date.now() };
   return cached || null;
 }

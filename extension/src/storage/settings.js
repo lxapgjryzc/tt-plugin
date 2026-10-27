@@ -5,7 +5,7 @@ export const KEYS = {
   audit: 'chamber:audit',
   lock: 'chamber:lock',
   snapshot: 'chamber:snapshot', // last term summary for the popup (local, small)
-  token: 'chamber:token', // session storage only
+  token: 'chamber:token', // the site's bearer token (local storage, survives restarts)
   lastTick: 'chamber:lastTick',
 };
 

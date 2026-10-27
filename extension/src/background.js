@@ -195,7 +195,7 @@ self.chamber = { probe, tick, getAudit, getSettings, setSettings, listBacklog: s
 const handlers = {
   'chamber:token': async ({ token }, sender) => {
     if (!sender.url?.startsWith(target.base)) return { ok: false };
-    const prev = (await chrome.storage.session.get(KEYS.token))[KEYS.token];
+    const prev = (await chrome.storage.local.get(KEYS.token))[KEYS.token];
     await storeToken(token || null);
     const s = await getSettings();
     if (token && (token !== prev || s.sessionInvalid)) tickSoon();

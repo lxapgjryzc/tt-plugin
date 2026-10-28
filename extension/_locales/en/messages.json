@@ -46,15 +46,6 @@
       }
     }
   },
-  "modePaused": {
-    "message": "Paused"
-  },
-  "modeDryRun": {
-    "message": "Dry run"
-  },
-  "modeManual": {
-    "message": "Manual"
-  },
   "noTab": {
     "message": "Open tenten.art and log in."
   },
@@ -72,28 +63,11 @@
       }
     }
   },
-  "needsAttention": {
-    "message": "Needs attention"
-  },
-  "nowSubmitting": {
-    "message": "Now submitting"
-  },
   "inReview": {
     "message": "In review"
   },
   "noneInReview": {
     "message": "Nothing waiting for review."
-  },
-  "nextUp": {
-    "message": "Next up"
-  },
-  "nMore": {
-    "message": "… $P1$ more",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
   },
   "emptyQueue": {
     "message": "Nothing queued. Drop an image in the queue page."
@@ -103,12 +77,6 @@
   },
   "resumeAll": {
     "message": "Resume"
-  },
-  "openQueue": {
-    "message": "Open queue"
-  },
-  "addImage": {
-    "message": "Add an image"
   },
   "remove": {
     "message": "Remove"
@@ -148,7 +116,7 @@
     "message": "Only check during review hours"
   },
   "reviewHoursHint": {
-    "message": "Beijing time, when TAs review. Outside these hours the regular check pauses (it keeps going for 30 minutes after each window). Adding an image, opening the popup or Run one check now still checks right away."
+    "message": "Beijing time, when TAs review. Outside these hours the regular check pauses (it keeps going for 30 minutes after each window). Adding an image, clicking the toolbar icon or Run one check now still checks right away."
   },
   "reviewHoursLocal": {
     "message": "Your time: $P1$",

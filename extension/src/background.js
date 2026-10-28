@@ -187,6 +187,9 @@ chrome.notifications.onClicked.addListener(async (id) => {
   else openQueue();
 });
 
+// The toolbar icon opens the queue page (no popup) and checks right away.
+chrome.action.onClicked.addListener(() => { openQueue(); tickSoon(300); });
+
 async function openQueue(query = '') {
   const url = chrome.runtime.getURL(`ui/options.html${query}`);
   const [tab] = await chrome.tabs.query({ url: chrome.runtime.getURL('ui/options.html*') });
@@ -361,8 +364,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 });
 
 // Periodic checks pause while TAs are off duty: no review means no slot can free up.
-// Only the alarm is affected; checks triggered by the user (adding an image, opening
-// the popup, Run one check now, visiting the site) still run, so a free slot is used.
+// Only the alarm is affected; checks triggered by the user (adding an image, clicking
+// the toolbar icon, Run one check now, visiting the site) still run, so a free slot is used.
 chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name !== ALARM) return;
   const s = await getSettings();

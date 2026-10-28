@@ -16,7 +16,7 @@ The site's login token is valid for exactly 24 hours and the site has no way to 
 
 - **Reminders (default).** A notification about an hour before the login expires, and a persistent one (plus a red **!** on the toolbar icon) once it has. Click it to open the site and log in; queued drawings wait meanwhile and the extension resumes on its own.
 - **Automatic login (opt-in).** Queue page → **Automatic login**: tick it, enter your phone or email and password, **Save**. The extension then logs in with the site's password login (it has no captcha) whenever the session is about to run out, and also restores the site's own login when you open it. If the site refuses the password, it stops and notifies you instead of retrying, so a wrong password cannot get the account locked; network errors are retried at most every 10 minutes. **The password is stored unencrypted** in this Chrome profile (`chrome.storage.local`), readable only by this extension, never logged, never exposed to the site page, and sent only to `tenten.art/api/auth/password/login`. **Forget account** removes it.
-4. Click the toolbar icon → **Open queue**.
+4. Click the toolbar icon to open the queue page.
 
 After pulling new code, click the reload button on the extension's card in `chrome://extensions`, then refresh any open tenten.art tab.
 
@@ -26,9 +26,9 @@ After pulling new code, click the reload button on the extension's card in `chro
 - **Queue page.** Drop, paste or pick an image, choose the target node, and click **Add to queue**. Approved nodes, and assignments where nothing can be queued right now (closed, prerequisite missing, every open node locked or already queued), are hidden unless you tick **Show all**. Other nodes that cannot be submitted are greyed out; hover for the reason. A locked node can be queued if the node before it is already queued or under review; it waits until that node is approved.
 - **Submission order.** When a slot frees up, the next item is picked by: earliest deadline → revisions (a returned node blocks every later node) → required before optional → your own order. The queue page lists items in that order and tags them **Due MM-DD**, **Revision**, **Optional**. Drag (or Alt+↑/↓) to reorder within the same priority; Delete removes.
 - **Updating a queued drawing.** Queued items have **Replace image** on the queue page. Locked nodes queued behind an earlier node go out automatically once that node is approved, so if a returned earlier node means a later drawing needs changes, replace it before then.
-- **Review hours.** TAs only review at certain times (measured from the review history: 10:00–15:00 and 18:00–23:00 Beijing time, every day). Outside them no slot can free up, so the regular check pauses, continuing 30 minutes past each window so a slot freed by the last review is still filled at once. Anything you do (adding an image, opening the popup, Run one check now, visiting the site) still checks immediately, since the review queue is ordered by submission time. Edit the hours or turn this off under Controls; your local times are shown next to them.
+- **Review hours.** TAs only review at certain times (measured from the review history: 10:00–15:00 and 18:00–23:00 Beijing time, every day). Outside them no slot can free up, so the regular check pauses, continuing 30 minutes past each window so a slot freed by the last review is still filled at once. Anything you do (adding an image, clicking the toolbar icon, Run one check now, visiting the site) still checks immediately, since the review queue is ordered by submission time. Edit the hours or turn this off under Controls; your local times are shown next to them.
 - **Revisions.** When a submission comes back as reviewed / returned / shelved, its item turns into **Revision** with the teacher's feedback and review images. The returned image is never sent again. Queue your revised drawing like any other (on the site or the queue page) and it replaces that item.
-- **Popup.** Slot meter (one dot per slot, filled = in use), what is being submitted, what is in review with the platform's queue position and estimate, what needs attention, what is next, and **Pause all**.
+- **Toolbar icon.** Opens the queue page (or switches to it if already open) and runs a check. Its badge shows slots in use (e.g. **1/2**), the number of items needing attention, **||** when paused, or a red **!** when the login has run out.
 - **Floating badge** in the bottom-right of the assignment page: hover it and click to open the queue page for that assignment. × hides it for the tab.
 
 ### First run
@@ -95,7 +95,7 @@ extension/            the folder Chrome loads (runtime files only)
     token-bridge.js   reads the session token from the page
     storage/          IndexedDB (queue + images), chrome.storage (settings, lock, log)
     content/          scripts injected into tenten.art: badge + queue button, timezone fix
-  ui/                 popup and queue page
+  ui/                 queue page
 test/                 node:test unit tests, incl. a fake platform for eviction, timeouts, 429, rejections
 tools/                generators for strings and icons
 ```

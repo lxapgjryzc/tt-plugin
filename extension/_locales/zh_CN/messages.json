@@ -46,15 +46,6 @@
       }
     }
   },
-  "modePaused": {
-    "message": "已暂停"
-  },
-  "modeDryRun": {
-    "message": "演练模式"
-  },
-  "modeManual": {
-    "message": "手动"
-  },
   "noTab": {
     "message": "请打开 tenten.art 并登录。"
   },
@@ -72,28 +63,11 @@
       }
     }
   },
-  "needsAttention": {
-    "message": "需要处理"
-  },
-  "nowSubmitting": {
-    "message": "正在提交"
-  },
   "inReview": {
     "message": "批改中"
   },
   "noneInReview": {
     "message": "当前没有待批改的作业。"
-  },
-  "nextUp": {
-    "message": "接下来"
-  },
-  "nMore": {
-    "message": "…… 还有 $P1$ 项",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
   },
   "emptyQueue": {
     "message": "队列为空。在队列页拖入一张图片。"
@@ -103,12 +77,6 @@
   },
   "resumeAll": {
     "message": "继续"
-  },
-  "openQueue": {
-    "message": "打开队列"
-  },
-  "addImage": {
-    "message": "添加图片"
   },
   "remove": {
     "message": "移除"
@@ -148,7 +116,7 @@
     "message": "只在批改时间检查"
   },
   "reviewHoursHint": {
-    "message": "北京时间，即助教批改的时间。其余时间暂停定时检查（每段结束后再继续 30 分钟）。添加图片、打开弹窗或点「立即检查一次」仍会立即检查。"
+    "message": "北京时间，即助教批改的时间。其余时间暂停定时检查（每段结束后再继续 30 分钟）。添加图片、点击工具栏图标或点「立即检查一次」仍会立即检查。"
   },
   "reviewHoursLocal": {
     "message": "你的本地时间：$P1$",

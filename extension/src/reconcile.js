@@ -117,8 +117,18 @@ export function reconcile({ target, term, backlog }) {
         }
         break;
       }
+      case 'needs_revision': {
+        // Waits for the user, but the user may resubmit on the site itself. Follow the
+        // latest round from the returned one on, so a resubmission shows as pending and
+        // its approval as done instead of the item staying "returned" forever.
+        const subs = nodeSubmissions(assignment, item.nodeId);
+        const at = item.submissionId ? subs.findIndex((s) => String(s.submissionId) === String(item.submissionId)) : -1;
+        if (at >= 0) push(item, patchFromRound(target, item, subs[subs.length - 1]));
+        else if (nodeStatus(assignment, node) === target.doneStatus) push(item, { status: 'done', reason: null });
+        break;
+      }
       default:
-        // needs_revision / blocked wait for the user.
+        // blocked waits for the user.
         break;
     }
   }

@@ -174,6 +174,23 @@ test('reconcile: pending -> needs_revision with feedback, -> done', () => {
   assert.equal(p[0].patch.status, 'done');
 });
 
+test('reconcile: returned item follows a resubmission made on the site', () => {
+  const term = makeTerm();
+  const s = addRound(term, ids.A1, ids.A1n2, 'RETURNED', { fileObjectName: 'assignments/me.jpg' });
+  const it = item({ status: 'needs_revision', objectName: 'assignments/me.jpg', submissionId: s.submissionId });
+  for (const { patch } of reconcile({ target, term, backlog: [it] })) assert.equal(patch.status, 'needs_revision');
+  const s2 = addRound(term, ids.A1, ids.A1n2, 'SUBMITTED', { fileObjectName: 'assignments/site.jpg' });
+  let p = reconcile({ target, term, backlog: [it] });
+  assert.equal(p[0].patch.status, 'pending');
+  assert.equal(p[0].patch.submissionId, s2.submissionId);
+  setStatus(term, ids.A1, ids.A1n2, 'APPROVED');
+  p = reconcile({ target, term, backlog: [it] });
+  assert.equal(p[0].patch.status, 'done');
+  // Without a tracked round, an approved node still clears it.
+  p = reconcile({ target, term, backlog: [{ ...it, submissionId: null }] });
+  assert.equal(p[0].patch.status, 'done');
+});
+
 test('reconcile: in-doubt submitting resolves from server state', () => {
   // landed, file matches
   let term = makeTerm();

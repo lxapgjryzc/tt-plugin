@@ -8,7 +8,7 @@ import { selectTerm, listAssignments, countPending, findAssignment, nodeSubmissi
 import { canQueue } from './scheduler.js';
 import { loadMessages, format, PAGE_LOCALE } from './i18n.js';
 import { getToken, storeToken, usable } from './token-bridge.js';
-import { sessionState, tokenExpiry } from './session.js';
+import { sessionState, tokenExpiry, fresherToken } from './session.js';
 import { tryAutoLogin, autoLoginActive, loginStatus, saveLogin, forgetLogin } from './auto-login.js';
 import { parseReviewHours, inReviewHours } from './review-hours.js';
 import * as store from './storage/idb.js';
@@ -254,7 +254,7 @@ const handlers = {
     if (usable(token)) {
       // Adopt the page's token unless ours is still good and lasts longer (e.g. the page
       // holds yesterday's token while automatic login already got a new one).
-      if (usable(prev) && (tokenExpiry(prev) ?? 0) >= (tokenExpiry(token) ?? 0)) return { ok: true };
+      if (fresherToken(prev, token) === prev) return { ok: true };
       await storeToken(token);
       tickSoon(); // a fresh login: resume (the tick clears sessionInvalid)
     } else if (!token && !(await getSettings()).autoLogin) {

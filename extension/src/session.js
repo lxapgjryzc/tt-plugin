@@ -42,3 +42,19 @@ export function sessionState({ token, sessionInvalid }, now = Date.now()) {
   if (exp <= now) return 'expired';
   return exp - now <= EXPIRING_SOON_MS ? 'expiring' : 'ok';
 }
+
+// Of two tokens, the one to use: an unexpired one, and of two unexpired ones the one
+// that lasts longer (ties go to `a`). Tokens without an expiry count as unexpired but
+// never beat one that has a known expiry in the future. Null if neither is usable.
+export function fresherToken(a, b, now = Date.now()) {
+  const left = (t) => {
+    if (!t) return null;
+    const exp = tokenExpiry(t);
+    if (exp === null) return 0;
+    return exp > now ? exp : null;
+  };
+  const la = left(a);
+  const lb = left(b);
+  if (lb !== null && (la === null || lb > la)) return b;
+  return la !== null ? a : null;
+}

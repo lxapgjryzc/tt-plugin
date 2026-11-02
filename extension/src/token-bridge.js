@@ -8,7 +8,7 @@
 
 import { target } from './target.js';
 import { KEYS } from './storage/settings.js';
-import { tokenExpiry } from './session.js';
+import { tokenExpiry, fresherToken } from './session.js';
 
 const CACHE_MS = 30_000;
 let mem = { token: null, at: 0 };
@@ -49,13 +49,14 @@ export async function storeToken(token) {
 // rejected one has already been dropped from storage by then).
 export async function getToken({ fresh = false } = {}) {
   if (!fresh && usable(mem.token) && Date.now() - mem.at < CACHE_MS) return mem.token;
+  // An open site tab may still hold an older token than ours (e.g. yesterday's, while
+  // automatic login already got a new one). Use whichever lasts longer, so a fresh login
+  // is not overwritten and repeated an hour before the page's token runs out.
   const live = await readFromTab();
-  if (usable(live)) {
-    await storeToken(live);
-    return live;
-  }
   const { [KEYS.token]: stored } = await chrome.storage.local.get(KEYS.token);
-  if (!usable(stored)) return null;
-  mem = { token: stored, at: Date.now() };
-  return stored;
+  const best = fresherToken(live, stored);
+  if (!best) return null;
+  if (best !== stored) await storeToken(best);
+  else mem = { token: best, at: Date.now() };
+  return best;
 }

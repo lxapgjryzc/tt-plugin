@@ -1,0 +1,138 @@
+# Requirements
+
+Feature requirements that go beyond what the README describes. Each section states what the
+user sees, the rules the code must follow, and the edge cases tests must cover. Platform facts
+are in the README's *Platform notes*; facts not yet verified against a real submission are
+marked **unverified**.
+
+---
+
+## R1. Several images per submission
+
+### Background
+
+On the course learning page (`/student/learning/:termId`) the site lets a student submit up to
+**3 images** in one round. Each image is uploaded separately (`POST /api/files/upload`); the
+resulting `objectName`s are joined with `,` and sent as the single `fileUrl` of the normal
+`POST`/`PUT .../submissions` call. Accepted types there: PNG, JPEG, WebP, GIF; each at most
+10 MB. (The single-assignment page `/student/assignment/:id` only takes one PNG/JPEG/WebP.)
+Rounds expose their files as `fileUrls` / `fileObjectNames` arrays.
+
+### Requirements
+
+- **R1.1** A queued item holds an ordered list of 1–3 images. The list is sent as one round,
+  in that order.
+- **R1.2** Every image is checked when it is added, with no network call: type one of PNG,
+  JPEG, WebP, GIF; not empty; at most 10 MB. More than 3 images is refused with a message
+  (extra images are not silently dropped).
+- **R1.3** Upload is resumable: object names are stored on the item as each image finishes,
+  so an interrupted or failed upload continues with the next image instead of uploading
+  earlier ones again. Replacing the images discards stored object names.
+- **R1.4** Recognising our own round on the server (duplicate guard, in-doubt resolution)
+  matches **any** of the item's object names against the round's file keys. File keys that
+  contain `,` are split. (**Unverified**: exact shape of `fileObjectName` for a multi-image
+  round; matching works whether it is the first name, the joined string, or absent.)
+- **R1.5** Queue page: drop, paste or pick adds images to the pending set up to 3 (paste
+  appends, like the site's dialog). The set is shown as thumbnails, each removable. *Replace
+  images* on an item replaces the whole set (1–3 images).
+- **R1.6** Queue rows show the first image with a count when there are more.
+- **R1.7** On the site:
+  - The single-assignment page keeps its one-image **加入 Chamber 队列** button.
+  - The learning page's 确认提交作业 dialog gets a **加入 Chamber 队列** button below the image
+    list. It queues all images in the dialog, in order, for the node the dialog names.
+    The dialog shows only chapter title · type label · node title, so the extension resolves
+    the node through `GET /student/courses/terms/{termId}/catalog` (chapter `groupTitle` →
+    assignment whose label matches → node by title). If this is ambiguous or not found it
+    refuses with a message and queues nothing. The 完整作业 dialog is refused (R3).
+  - The site's own controls are not changed; after queuing, the dialog stays open with a note.
+- **R1.8** Existing queued items (one image, one object name) keep working after the update
+  (stored data is migrated).
+
+---
+
+## R2. Follow-up submissions on a node that is not approved yet
+
+### Background
+
+Some nodes hand out four or more references, and a TA reviews about two per round. The
+student writes on the drawing that more is coming; the TA then **returns** the node instead
+of approving it, and the student submits the next part. But:
+
+- a TA sometimes approves directly, skipping the remaining parts;
+- the student may decide not to do the rest and leave it approved.
+
+There is no API field for a student note, and nothing in the data marks such a node (only
+titles like 【6个】). So the extension does not try to detect them. Instead, **any node that is
+submitted but not approved accepts further queued items**, and each goes out after the
+previous round comes back returned.
+
+### Requirements
+
+- **R2.1 Queuing.** A node can be queued when its latest round is in review
+  (SUBMITTED/REVIEWING) or came back (REVIEWED/RETURNED/SHELVED), and also when it already
+  has items of ours (queued, in flight, in review). New items go after the existing ones. The
+  picker and the site button say that such an item is a **follow-up**: it is sent once the
+  current round is returned. Approved nodes still cannot be queued.
+- **R2.2 Sending.** At most one item per node is in review at a time. A follow-up waits while
+  the node's latest round is in review, and is sent (as `PUT`) once that round is
+  returned, subject to slots and the usual priority (it ranks as a revision). Several
+  follow-ups on one node go out one per review cycle, in queue order.
+- **R2.3 Approved before all follow-ups were sent.** When the node becomes approved, every
+  item of ours on it that was not sent yet becomes **Skipped** (*not sent: node approved*).
+  Skipped is final: it is never sent, never blocks anything, does not count as needing
+  attention, and is cleared with *Clear finished*. One notification per skipped item. Later
+  nodes queued behind this node proceed as usual. This also applies to an item that was
+  already uploading when the approval arrived (the final preflight sees the approval).
+- **R2.4 Returned item followed by a follow-up.** A returned item keeps its feedback and
+  review images. Once a later item of ours on the same node is submitted, the returned item
+  becomes **Continued** (final, keeps feedback). While a follow-up for it is waiting, the
+  returned item does not count as needing attention.
+- **R2.5 Own rounds are not "submitted elsewhere".** The check that stops an item when a
+  round was submitted for its node outside the extension ignores rounds made by our own
+  items (recognised by uploaded object names, or a sibling still in doubt). The baseline
+  moves past our own rounds; a round that is not ours still blocks the item.
+- **R2.6 Behaviour kept.** Queuing on a node whose item is *blocked* or *failed* still
+  replaces that item. A *returned* item is no longer replaced by a new queue entry: the new
+  entry is a follow-up (R2.4), so the TA's feedback stays visible.
+- **R2.7 Never stuck.** No combination of approve / return / site submission leaves an item
+  waiting forever or blocks other items: queued items on approved nodes are skipped;
+  follow-ups on returned nodes go out; foreign rounds block only the affected item.
+
+### Scenarios that tests must cover
+
+1. A pending, B queued on the same node → B waits; node returned → B sent once (PUT); A
+   becomes Continued.
+2. A pending, B and C queued → returned → B sent; returned again → C sent; approved → A and B
+   Continued, C Approved, three writes in total.
+3. A pending, B queued → TA approves → A done, B skipped, no write; a later locked node
+   queued behind it is sent.
+4. A pending, B queued → student submits on the site → B blocked (submitted elsewhere).
+5. B queued while A is still queued (neither sent) → A sent, B not blocked by A's round,
+   waits; returned → B sent.
+6. Approval arrives while B is uploading → B skipped at preflight, no write.
+
+---
+
+## R3. 完整作业 (final submission) reminder
+
+### Background
+
+After every node of a non-graduation assignment is approved, the site shows an extra
+完整作业 step (`/student/assignments/{id}/final-submission`, 1–3 images, can be updated or
+withdrawn). It takes no review slot, so queuing it has no value.
+
+### Requirements
+
+- **R3.1** The queue page lists assignments where every node is approved, the assignment is
+  not a graduation project, not closed, and `finalSubmission` is empty, under *完整作业 not
+  submitted*, with a link to the site's learning page. Hidden when empty.
+- **R3.2** The extension never submits, updates or withdraws final submissions.
+
+---
+
+## Out of scope
+
+- Withdrawing submissions (deliberately never done).
+- Replacing a round that is still in review (the site allows a `PUT` over it; the server's
+  exact behaviour is unverified, and it would bypass R2.2).
+- Grouping the node picker by chapter.

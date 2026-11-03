@@ -8,7 +8,9 @@ export const target = {
   pendingStatuses: ['SUBMITTED', 'REVIEWING'],
   doneStatus: 'APPROVED',
   needsRevisionStatuses: ['REVIEWED', 'RETURNED', 'SHELVED'],
-  // Upload size cap enforced by the SPA.
+  // Image rules enforced by the SPA's multi-image dialog (learning page).
   maxUploadBytes: 10 * 1024 * 1024,
+  maxImagesPerSubmission: 3,
+  imageTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
   uploadPrefix: 'assignments/',
 };

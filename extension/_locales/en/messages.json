@@ -180,7 +180,7 @@
     "message": "Optional"
   },
   "clearFinished": {
-    "message": "Clear approved"
+    "message": "Clear finished"
   },
   "moveUp": {
     "message": "Move up"
@@ -191,8 +191,19 @@
   "retry": {
     "message": "Retry"
   },
-  "replaceImage": {
-    "message": "Replace image"
+  "replaceImages": {
+    "message": "Replace images"
+  },
+  "imageCount": {
+    "message": "$P1$ images",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "followUpQueued": {
+    "message": "Follow-up queued"
   },
   "reviewImage": {
     "message": "Review image $P1$",
@@ -206,24 +217,38 @@
     "message": "Add to queue"
   },
   "dropAria": {
-    "message": "Choose, drop or paste an image"
+    "message": "Choose, drop or paste images"
   },
   "dropHint": {
-    "message": "Drop, paste or click to choose an image"
+    "message": "Drop, paste or click to choose up to 3 images"
   },
   "dropSub": {
-    "message": "Up to 10 MB"
+    "message": "Sent together as one submission. PNG, JPG, WebP or GIF, up to 10 MB each"
   },
-  "fileInfo": {
-    "message": "$P1$ · $P2$ MB",
+  "imagesInfo": {
+    "message": "$P1$ of $P2$ images · $P3$ MB",
     "placeholders": {
       "p1": {
         "content": "$1"
       },
       "p2": {
         "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
       }
     }
+  },
+  "imageN": {
+    "message": "Image $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "removeImage": {
+    "message": "Remove image"
   },
   "searchNodes": {
     "message": "Search assignments and nodes"
@@ -242,6 +267,12 @@
   },
   "chainedHint": {
     "message": "Locked now; it waits until the previous node is approved."
+  },
+  "followUp": {
+    "message": "Follow-up"
+  },
+  "followUpHint": {
+    "message": "This node is in review or already queued; this goes out after it, once the node is returned. If the node is approved first, it is not sent."
   },
   "noMatches": {
     "message": "No matching nodes."
@@ -266,6 +297,12 @@
   },
   "errTooLarge": {
     "message": "Image is larger than 10 MB."
+  },
+  "errImageType": {
+    "message": "Only PNG, JPG, WebP and GIF images are accepted."
+  },
+  "errTooManyImages": {
+    "message": "At most 3 images per submission. Remove some first."
   },
   "errNoNode": {
     "message": "Pick a target node."
@@ -296,6 +333,12 @@
   },
   "stFailed": {
     "message": "Failed"
+  },
+  "stContinued": {
+    "message": "Returned, followed up"
+  },
+  "stSkipped": {
+    "message": "Not sent"
   },
   "nsSubmitted": {
     "message": "Submitted"
@@ -369,8 +412,17 @@
   "reasonPendingOnNode": {
     "message": "This node is already waiting for review"
   },
-  "reasonAlreadyQueued": {
-    "message": "Already in the queue"
+  "reasonApprovedBeforeSent": {
+    "message": "Not sent: the node was approved first"
+  },
+  "reasonFinalSubmission": {
+    "message": "完整作业 cannot be queued; submit it on the site"
+  },
+  "reasonAmbiguousNode": {
+    "message": "Could not tell which node this is; add it on the queue page"
+  },
+  "reasonOtherTerm": {
+    "message": "This term is not the one the extension follows"
   },
   "reasonNodeChanged": {
     "message": "The node changed on the platform; check it there"
@@ -403,7 +455,7 @@
     "message": "Waiting for the previous node to be approved"
   },
   "waitNodePending": {
-    "message": "Waiting: this node is under review"
+    "message": "Waiting: this node is under review; goes out once it is returned"
   },
   "waitSameNode": {
     "message": "Waiting for the earlier item on this node"
@@ -523,6 +575,12 @@
   "enqueuedChained": {
     "message": "Queued after the previous node. It will be submitted once that node is approved."
   },
+  "enqueuedFollowUp": {
+    "message": "Queued as a follow-up. It will be submitted after this node comes back returned; if the node is approved first, it is not sent."
+  },
+  "enqueuedCloseDialog": {
+    "message": "You can close this dialog."
+  },
   "enqueueFailed": {
     "message": "Could not add to the queue"
   },
@@ -622,5 +680,17 @@
   },
   "notifyApproved": {
     "message": "Approved"
+  },
+  "notifySkipped": {
+    "message": "Approved early, follow-up not sent"
+  },
+  "finalDue": {
+    "message": "完整作业 not submitted"
+  },
+  "finalDueHint": {
+    "message": "Every node is approved. Submit the 完整作业 on the site; the extension does not queue it."
+  },
+  "openOnSite": {
+    "message": "Open on site"
   }
 }

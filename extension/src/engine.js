@@ -118,11 +118,17 @@ async function tickLocked(deps, settings, { manual, owner }) {
     return { why: 'dryRun', method: decision.method, itemId: item.id };
   }
 
-  // 3. Upload (reuse an earlier objectName if we have one).
+  // 3. Upload the images in order. Each object name is stored as soon as it exists, so
+  // an interrupted or failed upload resumes with the next image (requirements R1.3).
   if (!(await store.patchItem(item.id, { status: 'uploading', reason: null }, 'queued'))) return { why: 'raced' };
-  let objectName = item.objectName;
-  if (!objectName) {
-    const img = await store.getImage(item.imageId);
+  const imageIds = item.imageIds || [];
+  let objectNames = (item.objectNames || []).slice(0, imageIds.length);
+  if (!imageIds.length) {
+    await store.patchItem(item.id, { status: 'failed', reason: 'reasonImageMissing' }, 'uploading');
+    return { why: 'imageMissing' };
+  }
+  for (let k = objectNames.length; k < imageIds.length; k++) {
+    const img = await store.getImage(imageIds[k]);
     if (!img?.blob) {
       await store.patchItem(item.id, { status: 'failed', reason: 'reasonImageMissing' }, 'uploading');
       return { why: 'imageMissing' };
@@ -131,6 +137,7 @@ async function tickLocked(deps, settings, { manual, owner }) {
       await store.patchItem(item.id, { status: 'blocked', reason: 'reasonTooLarge' }, 'uploading');
       return { why: 'tooLarge' };
     }
+    let objectName;
     try {
       objectName = (await api.upload(img.blob, img.name)).objectName;
     } catch (e) {
@@ -147,12 +154,15 @@ async function tickLocked(deps, settings, { manual, owner }) {
           status: retryable ? 'failed' : 'blocked', reason: 'reasonUploadFailed', reasonDetail: e.message, attempts,
         }, 'uploading');
       }
-      await audit({ ...ctx, action: 'upload', result: 'error', status: e?.status ?? null, message: e?.message });
+      await audit({ ...ctx, action: 'upload', result: 'error', image: k + 1, status: e?.status ?? null, message: e?.message });
       return { why: 'uploadError' };
     }
-    await store.patchItem(item.id, { objectName, attempts: 0, nextAttemptAt: null }, 'uploading');
-    await audit({ ...ctx, action: 'upload', result: 'ok' });
+    objectNames = [...objectNames, objectName];
+    await store.patchItem(item.id, { objectNames, attempts: 0, nextAttemptAt: null }, 'uploading');
+    await audit({ ...ctx, action: 'upload', result: 'ok', image: k + 1, of: imageIds.length });
   }
+  // The site sends a multi-image round as one comma-joined fileUrl.
+  const fileUrl = objectNames.join(',');
 
   // 4. Re-read state immediately before the write. This is the double-submit guard.
   await deps.lock.refresh(owner);
@@ -165,9 +175,10 @@ async function tickLocked(deps, settings, { manual, owner }) {
     : preflight({ target, term, item, roundsBefore: decision.roundsBefore });
   if (blocker) {
     const transient = blocker === 'paused' || TRANSIENT_PREFLIGHT.has(blocker);
-    await store.patchItem(item.id, transient
-      ? { status: 'queued', reason: null }
-      : { status: 'blocked', reason: blocker }, 'uploading');
+    let patch = transient ? { status: 'queued', reason: null } : { status: 'blocked', reason: blocker };
+    // Approved while we were uploading: this follow-up is no longer needed (R2.3).
+    if (blocker === 'reasonApproved') patch = { status: 'skipped', reason: 'reasonApprovedBeforeSent' };
+    await store.patchItem(item.id, patch, 'uploading');
     await audit({ ...ctx, result: `preflight: ${blocker}` });
     // A round may have appeared that is ours (e.g. a previous lost request).
     await applyReconcile(deps, term);
@@ -182,8 +193,8 @@ async function tickLocked(deps, settings, { manual, owner }) {
 
   // 5. The one write that matters. Never retried in this tick.
   try {
-    if (method === 'POST') await api.createSubmission(item.assignmentId, item.nodeId, objectName);
-    else await api.updateSubmission(item.assignmentId, item.nodeId, objectName);
+    if (method === 'POST') await api.createSubmission(item.assignmentId, item.nodeId, fileUrl);
+    else await api.updateSubmission(item.assignmentId, item.nodeId, fileUrl);
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) throw e;
     await audit({ ...ctx, method, result: 'error', status: e?.status ?? null, message: e?.message });

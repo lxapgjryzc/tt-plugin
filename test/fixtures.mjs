@@ -47,8 +47,8 @@ export const ids = {
 
 export function item(over = {}) {
   return {
-    id: `item-${++seq}`, imageId: `img-${seq}`, assignmentId: ids.A1, nodeId: ids.A1n2, title: 'x',
-    status: 'queued', reason: null, objectName: null, submissionId: null, roundsBefore: null,
+    id: `item-${++seq}`, imageIds: [`img-${seq}`], assignmentId: ids.A1, nodeId: ids.A1n2, title: 'x',
+    status: 'queued', reason: null, objectNames: [], submissionId: null, roundsBefore: null,
     attempts: 0, nextAttemptAt: null, order: seq, createdAt: new Date(seq).toISOString(), ...over,
   };
 }
@@ -107,7 +107,10 @@ export function fakeServer(term) {
     if (pending >= term.maxPendingSubmissions) throw new ApiError(200, 400, '待批改作业已达上限');
     if (n.locked) throw new ApiError(200, 400, '节点未解锁');
     if (['SUBMITTED', 'REVIEWING', 'APPROVED'].includes(n.status)) throw new ApiError(200, 400, '不可重复提交');
-    addRound(term, assignmentId, nodeId, 'SUBMITTED', { fileObjectName: fileUrl, fileObjectNames: [fileUrl], queuePosition: 3, estimatedWaitMinutes: 40 });
+    // A multi-image round arrives as one comma-joined fileUrl. How the platform echoes it
+    // back is unverified, so the fake keeps the joined string and also splits it.
+    addRound(term, assignmentId, nodeId, 'SUBMITTED', { fileObjectName: fileUrl, fileObjectNames: fileUrl.split(','), queuePosition: 3, estimatedWaitMinutes: 40 });
+    calls.fileUrls = [...(calls.fileUrls || []), fileUrl];
     if (submitHook) await submitHook(method);
   };
   api.createSubmission = submit('post');

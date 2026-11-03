@@ -4,8 +4,9 @@ import {
 import * as store from '../src/storage/idb.js';
 import { KEYS, getSettings, getAudit } from '../src/storage/settings.js';
 import { target } from '../src/target.js';
-import { listAssignments, findAssignment, findNode, nodeStatus, nodeSubmissions, label } from '../src/model.js';
+import { listAssignments, findAssignment, findNode, nodeStatus, nodeSubmissions, label, finalSubmissionsDue } from '../src/model.js';
 import { prioritize, priorityOf, canQueue } from '../src/scheduler.js';
+import { imageProblem, imageSetProblem } from '../src/images.js';
 import { parseReviewHours } from '../src/review-hours.js';
 
 const $ = (id) => document.getElementById(id);
@@ -18,7 +19,7 @@ const state = {
   backlog: [],
   settings: null,
   snap: null,
-  image: null, // { blob, name }
+  images: [], // [{ blob, name, url }] in submission order, at most target.maxImagesPerSubmission
   selected: null, // { assignmentId, nodeId }
   thumbs: new Map(), // imageId -> object URL
   replaceId: null,
@@ -91,21 +92,32 @@ function renderHeader() {
 // ---------------------------------------------------------------------------
 // Backlog
 
+// The first image of the item's set, with a count when there are more.
 function thumbFor(item) {
-  const url = state.thumbs.get(item.imageId);
-  if (url) return el('img', { class: 'thumb', src: url, alt: '' });
+  const first = item.imageIds?.[0];
+  const count = item.imageIds?.length || 0;
+  const wrap = el('div', { class: 'thumb-wrap' },
+    count > 1 ? el('span', { class: 'thumb-count', 'aria-label': t('imageCount', [String(count)]), text: `+${count - 1}` }) : null);
+  const url = state.thumbs.get(first);
+  if (url) {
+    wrap.prepend(el('img', { class: 'thumb', src: url, alt: '' }));
+    return wrap;
+  }
   const ph = el('div', { class: 'thumb ph' }, icon('image'));
-  store.getImage(item.imageId).then((img) => {
-    if (!img?.blob) return;
-    const u = URL.createObjectURL(img.blob);
-    state.thumbs.set(item.imageId, u);
-    ph.replaceWith(el('img', { class: 'thumb', src: u, alt: '' }));
-  });
-  return ph;
+  wrap.prepend(ph);
+  if (first) {
+    store.getImage(first).then((img) => {
+      if (!img?.blob) return;
+      const u = URL.createObjectURL(img.blob);
+      state.thumbs.set(first, u);
+      ph.replaceWith(el('img', { class: 'thumb', src: u, alt: '' }));
+    });
+  }
+  return wrap;
 }
 
 function gcThumbs() {
-  const live = new Set(state.backlog.map((i) => i.imageId));
+  const live = new Set(state.backlog.map((i) => i.imageIds?.[0]));
   for (const [id, url] of state.thumbs) if (!live.has(id)) { URL.revokeObjectURL(url); state.thumbs.delete(id); }
 }
 
@@ -138,13 +150,15 @@ function itemRow(item, index) {
   if (item.status === 'queued' && notes[item.id]) sub.append(t(notes[item.id]));
   if (item.status === 'pending') sub.append(queueText(item.queuePosition, item.estimatedWaitMinutes));
 
-  const reasonShown = ['blocked', 'failed'].includes(item.status) || (item.status === 'queued' && item.reason);
+  if (item.status === 'needs_revision' && followedUp(item)) sub.append(t('followUpQueued'));
+
+  const reasonShown = ['blocked', 'failed', 'skipped'].includes(item.status) || (item.status === 'queued' && item.reason);
   const actions = el('div', { class: 'row-actions' });
   if (['blocked', 'failed'].includes(item.status)) {
     actions.append(el('button', { type: 'button', text: t('retry'), onclick: () => retry(item) }));
   }
   if (['queued', 'needs_revision', 'blocked', 'failed'].includes(item.status)) {
-    actions.append(el('button', { type: 'button', text: t('replaceImage'), onclick: () => pickReplacement(item.id) }));
+    actions.append(el('button', { type: 'button', text: t('replaceImages'), onclick: () => pickReplacement(item.id) }));
   }
 
   const links = el('div', { class: 'links' });
@@ -168,7 +182,7 @@ function itemRow(item, index) {
     el('div', { class: 'title', text: item.title }),
     sub,
     reasonShown ? el('div', { class: 'reason', text: reasonText(item.reason, item.reasonDetail) }) : null,
-    item.status === 'needs_revision' && item.teacherFeedback ? el('div', { class: 'feedback', text: item.teacherFeedback }) : null,
+    ['needs_revision', 'continued'].includes(item.status) && item.teacherFeedback ? el('div', { class: 'feedback', text: item.teacherFeedback }) : null,
     links.childElementCount ? links : null,
     actions.childElementCount ? actions : null),
   el('div', { class: 'tools' },
@@ -178,6 +192,12 @@ function itemRow(item, index) {
 
   wireDrag(li, item.id);
   return li;
+}
+
+// A returned item whose node already has a later item of ours waiting or out.
+function followedUp(item) {
+  return state.backlog.some((i) => i !== item && i.assignmentId === item.assignmentId && i.nodeId === item.nodeId
+    && ['queued', 'uploading', 'submitting', 'pending'].includes(i.status));
 }
 
 let dragId = null;
@@ -233,7 +253,7 @@ function renderBacklog() {
   list.replaceChildren(...state.backlog.map(itemRow));
   if (focused) list.querySelector(`li.row[data-id="${focused}"]`)?.focus();
   $('backlogEmpty').hidden = state.backlog.length > 0;
-  $('clearDone').hidden = !state.backlog.some((i) => i.status === 'done');
+  $('clearDone').hidden = !state.backlog.some((i) => FINISHED.has(i.status));
 
   // In review: server truth, including rounds submitted outside the extension.
   const pend = state.snap?.pending || [];
@@ -242,46 +262,69 @@ function renderBacklog() {
       el('div', { class: 'title', text: p.label }),
       el('div', { class: 'sub' }, nodeTag(p.status, false), queueText(p.queuePosition, p.estimatedWaitMinutes))))));
   $('reviewEmpty').hidden = pend.length > 0;
+
+  // 完整作业 not submitted yet: a reminder only, the extension never submits it (R3).
+  const due = state.term ? finalSubmissionsDue(state.term) : [];
+  $('finalDue').hidden = !due.length;
+  $('finalList').replaceChildren(...due.map((a) => el('li', { class: 'row' },
+    el('div', { class: 'main' },
+      el('div', { class: 'title', text: a.title }),
+      el('div', { class: 'sub' }, el('span', { class: 'tag', text: t(TYPE_KEYS[a.assignmentType] || 'typeOther') }))))));
 }
+
+// Items that are over: removed by "Clear finished".
+const FINISHED = new Set(['done', 'continued', 'skipped']);
 
 // ---------------------------------------------------------------------------
 // Add: image
 
-function validateImage(file) {
-  if (!file) return 'errNoImage';
-  if (!file.type.startsWith('image/')) return 'errNotImage';
-  if (file.size === 0) return 'errEmptyFile';
-  if (file.size > target.maxUploadBytes) return 'errTooLarge';
-  return null;
+const MAX_IMAGES = target.maxImagesPerSubmission;
+const fileName = (file) => file.name || `paste-${Date.now()}.${(file.type.split('/')[1] || 'png')}`;
+
+// Add files to the pending set. Invalid files are refused with a message; files past
+// the limit are refused too, never silently dropped (requirements R1.2).
+function addImages(files) {
+  files = [...(files || [])];
+  if (!files.length) return;
+  const bad = files.map((f) => imageProblem(target, f)).find(Boolean);
+  if (bad) { showAddError(t(bad)); return; }
+  if (state.images.length + files.length > MAX_IMAGES) {
+    showAddError(t('errTooManyImages'));
+    return;
+  }
+  for (const f of files) state.images.push({ blob: f, name: fileName(f), url: URL.createObjectURL(f) });
+  showAddError('');
+  renderImages();
 }
 
-let previewUrl = null;
-function setImage(file) {
-  const err = validateImage(file);
-  if (err) { showAddError(t(err)); return; }
-  state.image = { blob: file, name: file.name || `paste-${Date.now()}.${(file.type.split('/')[1] || 'png')}` };
-  if (previewUrl) URL.revokeObjectURL(previewUrl);
-  previewUrl = URL.createObjectURL(file);
-  $('preview').src = previewUrl;
-  $('preview').hidden = false;
-  $('dropText').hidden = true;
-  $('fileInfo').textContent = t('fileInfo', [state.image.name, (file.size / 1024 / 1024).toFixed(2)]);
-  showAddError('');
+function removeImage(index) {
+  const [gone] = state.images.splice(index, 1);
+  if (gone) URL.revokeObjectURL(gone.url);
+  renderImages();
+}
+
+function clearImages() {
+  for (const img of state.images) URL.revokeObjectURL(img.url);
+  state.images = [];
+  renderImages();
+}
+
+function renderImages() {
+  const has = state.images.length > 0;
+  $('previews').hidden = !has;
+  $('dropText').hidden = has;
+  $('previews').replaceChildren(...state.images.map((img, i) => el('div', { class: 'preview' },
+    el('img', { src: img.url, alt: t('imageN', [String(i + 1)]) }),
+    el('button', {
+      class: 'icon remove-image', type: 'button', title: t('removeImage'), 'aria-label': t('removeImage'),
+      onclick: (e) => { e.stopPropagation(); removeImage(i); },
+    }, icon('x')))));
+  const mb = state.images.reduce((n, i) => n + i.blob.size, 0) / 1024 / 1024;
+  $('fileInfo').textContent = has ? t('imagesInfo', [String(state.images.length), String(MAX_IMAGES), mb.toFixed(2)]) : '';
   updateAddButton();
 }
 
-function clearImage() {
-  state.image = null;
-  if (previewUrl) URL.revokeObjectURL(previewUrl);
-  previewUrl = null;
-  $('preview').hidden = true;
-  $('dropText').hidden = false;
-  $('fileInfo').textContent = '';
-}
-
-function firstImage(dt) {
-  return [...(dt?.files || [])].find((f) => f.type.startsWith('image/')) || dt?.files?.[0] || null;
-}
+const imageFiles = (dt) => [...(dt?.files || [])];
 
 // ---------------------------------------------------------------------------
 // Add: node picker
@@ -313,7 +356,7 @@ function renderPicker() {
       if (ps.ok) anySelectable = true;
       const nodeId = n ? String(n.nodeId) : null;
       const sel = state.selected?.assignmentId === String(a.assignmentId) && state.selected?.nodeId === nodeId;
-      const hint = ps.ok ? (ps.chained ? t('chainedHint') : '') : reasonText(ps.reason, ps.detail);
+      const hint = ps.ok ? [ps.chained ? t('chainedHint') : '', ps.followUp ? t('followUpHint') : ''].filter(Boolean).join(' ') : reasonText(ps.reason, ps.detail);
       const input = el('input', {
         type: 'radio', name: 'node', value: `${a.assignmentId}|${nodeId ?? ''}`, disabled: !ps.ok, checked: sel,
         onchange: () => { state.selected = { assignmentId: String(a.assignmentId), nodeId }; showAddError(''); updateAddButton(); markSelected(); },
@@ -321,7 +364,8 @@ function renderPicker() {
       rows.push(el('label', { class: `node${ps.ok ? '' : ' disabled'}${sel ? ' selected' : ''}`, title: hint || null, 'data-key': `${a.assignmentId}|${nodeId ?? ''}` },
         input,
         el('span', { class: 'node-title', text: n ? n.title || `#${n.nodeOrder}` : t('wholeAssignment') }),
-        ps.chained ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('chained') }) : nodeTag(status, n?.locked)));
+        ps.followUp ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('followUp') })
+          : ps.chained ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('chained') }) : nodeTag(status, n?.locked)));
     }
     // By default, hide assignments where nothing can be queued right now (closed,
     // prerequisite missing, every open node locked or already queued), like approved nodes.
@@ -344,7 +388,7 @@ function markSelected() {
 }
 
 function updateAddButton() {
-  $('addBtn').disabled = !(state.image && state.selected && state.term);
+  $('addBtn').disabled = !(state.images.length && state.selected && state.term);
 }
 
 function showAddError(msg) {
@@ -353,7 +397,7 @@ function showAddError(msg) {
 
 async function addItem() {
   const sel = state.selected;
-  const imgErr = validateImage(state.image?.blob);
+  const imgErr = imageSetProblem(target, state.images.map((i) => i.blob));
   if (imgErr) return showAddError(t(imgErr));
   if (!sel) return showAddError(t('errNoNode'));
   // Re-check eligibility client-side; a locked or otherwise unsubmittable node is
@@ -365,13 +409,14 @@ async function addItem() {
 
   const title = label(a, n);
   $('addBtn').disabled = true;
-  // enqueue() replaces an earlier item for this node that came back or got stuck.
+  // enqueue() replaces an item for this node that got stuck; otherwise the new item
+  // goes after any earlier ones on the node as a follow-up.
   await store.enqueue({
-    blob: state.image.blob, name: state.image.name, assignmentId: sel.assignmentId, nodeId: sel.nodeId, title,
+    images: state.images.map(({ blob, name }) => ({ blob, name })), assignmentId: sel.assignmentId, nodeId: sel.nodeId, title,
     roundsAtQueue: nodeSubmissions(a, sel.nodeId).length,
   });
   await chrome.storage.local.set({ 'chamber:lastPick': { assignmentId: sel.assignmentId, nodeId: sel.nodeId, label: title } });
-  clearImage();
+  clearImages();
   state.selected = null;
   await itemsChanged();
   $('drop').focus();
@@ -508,8 +553,11 @@ function wire() {
     try { await send('chamber:tick', { manual: true }); } finally { await refresh({ tree: true }); }
   });
   $('bannerAction').addEventListener('click', openSite);
+  $('finalOpen').addEventListener('click', () => {
+    chrome.tabs.create({ url: `${target.base}/student/learning${state.term ? `/${state.term.termId}` : ''}` });
+  });
   $('clearDone').addEventListener('click', async () => {
-    for (const i of state.backlog.filter((x) => x.status === 'done')) await store.removeItem(i.id);
+    for (const i of state.backlog.filter((x) => FINISHED.has(x.status))) await store.removeItem(i.id);
     await itemsChanged();
   });
 
@@ -518,19 +566,23 @@ function wire() {
   drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } });
   drop.addEventListener('dragover', (e) => { if (dragId) return; e.preventDefault(); drop.classList.add('over'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('over'));
-  drop.addEventListener('drop', (e) => { if (dragId) return; e.preventDefault(); drop.classList.remove('over'); setImage(firstImage(e.dataTransfer)); });
-  $('file').addEventListener('change', (e) => setImage(e.target.files[0]));
+  drop.addEventListener('drop', (e) => { if (dragId) return; e.preventDefault(); drop.classList.remove('over'); addImages(imageFiles(e.dataTransfer)); });
+  $('file').addEventListener('change', (e) => { addImages(e.target.files); e.target.value = ''; });
+  // Paste appends, like the site's own dialog.
   document.addEventListener('paste', (e) => {
-    const f = firstImage(e.clipboardData);
-    if (f) { e.preventDefault(); setImage(f); }
+    if (e.target.closest?.('input, textarea')) return;
+    const files = imageFiles(e.clipboardData);
+    if (files.length) { e.preventDefault(); addImages(files); }
   });
   $('replaceFile').addEventListener('change', async (e) => {
-    const f = e.target.files[0];
-    const err = validateImage(f);
+    const files = [...e.target.files];
+    const err = imageSetProblem(target, files);
     if (err) { showAddError(t(err)); return; }
     const cur = state.backlog.find((i) => i.id === state.replaceId);
     const a = cur && state.term ? findAssignment(state.term, cur.assignmentId) : null;
-    if (cur) await store.replaceImage(cur.id, f, f.name, a ? nodeSubmissions(a, cur.nodeId).length : null);
+    if (cur) {
+      await store.replaceImages(cur.id, files.map((f) => ({ blob: f, name: fileName(f) })), a ? nodeSubmissions(a, cur.nodeId).length : null);
+    }
     state.replaceId = null;
     await itemsChanged();
   });

@@ -67,32 +67,35 @@ export function countPending(target, term) {
   return pendingSubmissions(target, term).length;
 }
 
+// Every file key a round carries. A multi-image round is sent as one comma-joined
+// `fileUrl`, so keys containing commas are split as well.
 export function fileKeys(sub) {
   const keys = new Set();
   for (const v of [sub?.fileObjectName, sub?.fileUrl, ...(sub?.fileObjectNames || []), ...(sub?.fileUrls || [])]) {
-    if (v) keys.add(String(v));
+    if (!v) continue;
+    for (const part of String(v).split(',')) if (part.trim()) keys.add(part.trim());
   }
   return [...keys];
 }
 
-// Does this server round carry the file we uploaded? Object names are matched exactly or
-// as the path suffix of a full URL.
-export function submissionHasFile(sub, objectName) {
-  if (!objectName) return false;
-  const name = String(objectName).replace(/^\/+/, '');
-  return fileKeys(sub).some((k) => {
+// Does this server round carry any of the files we uploaded? Object names are matched
+// exactly or as the path suffix of a full URL. `objectNames` is a name or a list.
+export function submissionHasFile(sub, objectNames) {
+  const names = [].concat(objectNames ?? []).filter(Boolean).map((n) => String(n).replace(/^\/+/, ''));
+  if (!names.length) return false;
+  return fileKeys(sub).some((k) => names.some((name) => {
     if (k === name) return true;
     try {
       return decodeURIComponent(new URL(k).pathname).replace(/^\/+/, '').endsWith(name);
     } catch {
       return false;
     }
-  });
+  }));
 }
 
-export function findSubmissionByFile(assignment, nodeId, objectName) {
+export function findSubmissionByFile(assignment, nodeId, objectNames) {
   const subs = nodeSubmissions(assignment, nodeId);
-  for (let i = subs.length - 1; i >= 0; i--) if (submissionHasFile(subs[i], objectName)) return subs[i];
+  for (let i = subs.length - 1; i >= 0; i--) if (submissionHasFile(subs[i], objectNames)) return subs[i];
   return null;
 }
 
@@ -156,4 +159,57 @@ export function isSubmittable(target, term, assignment, nodeId, now = Date.now()
 export function label(assignment, node) {
   const a = assignment?.title || '?';
   return node ? `${a} / ${node.title || `#${node.nodeOrder}`}` : a;
+}
+
+// The type label the site shows for an assignment (e.g. in its submit dialog).
+const TYPE_LABELS = {
+  BASIC: '基础作业', ADVANCED: '进阶作业', EXTENDED: '扩展作业', BI_WEEKLY: '双周作业', GRADUATION: '毕业设计', DRILL: '团练打卡',
+};
+const STAGE_LABELS = { 1: '阶段一', 2: '阶段二', 3: '阶段三' };
+export function siteTypeLabel(assignment) {
+  if (assignment?.assignmentType === 'GRADUATION') {
+    const stage = STAGE_LABELS[assignment.stageNo];
+    return stage ? `毕设${stage}` : '毕业设计';
+  }
+  return TYPE_LABELS[assignment?.assignmentType] || assignment?.assignmentType || '';
+}
+
+/**
+ * Resolve the node named by the site's submit dialog, which only shows chapter title,
+ * type label and node title. `catalog` is GET /student/courses/terms/{id}/catalog.
+ * Returns { assignmentId, nodeId } or { error } with a message key. Never guesses:
+ * anything but exactly one match is an error.
+ */
+export function resolveDialogNode(catalog, { chapterTitle, typeLabel, nodeTitle }) {
+  const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const chapters = (catalog?.chapters || []).filter((c) => norm(c.groupTitle) === norm(chapterTitle));
+  const assignments = chapters.flatMap((c) => c.assignments || []).filter((a) => norm(siteTypeLabel(a)) === norm(typeLabel));
+  const hits = [];
+  for (const a of assignments) {
+    const nodes = a.nodes || [];
+    if (!nodes.length) {
+      if (!norm(nodeTitle)) hits.push({ assignmentId: sid(a.assignmentId), nodeId: null });
+      continue;
+    }
+    for (const n of nodes) if (norm(n.title) === norm(nodeTitle)) hits.push({ assignmentId: sid(a.assignmentId), nodeId: sid(n.nodeId) });
+  }
+  if (hits.length === 1) return hits[0];
+  if (norm(nodeTitle) === FINAL_STEP_TITLE && !hits.length) return { error: 'reasonFinalSubmission' };
+  return { error: hits.length ? 'reasonAmbiguousNode' : 'reasonNodeMissing' };
+}
+
+// Title of the extra step the site shows after every node is approved.
+export const FINAL_STEP_TITLE = '完整作业';
+
+// Assignments whose nodes are all approved but whose 完整作业 has not been submitted.
+// Graduation projects have no such step; closed assignments are left out.
+export function finalSubmissionsDue(term, now = Date.now()) {
+  if (!termIsActive(term)) return [];
+  return listAssignments(term)
+    .map(({ assignment }) => assignment)
+    .filter((a) => a.assignmentType !== 'GRADUATION'
+      && (a.nodes || []).length > 0
+      && a.nodes.every((n) => n.status === 'APPROVED')
+      && !a.finalSubmission
+      && !assignmentExpired(a, term.endDate, now));
 }

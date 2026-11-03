@@ -1,8 +1,24 @@
 // IndexedDB `chamber`: images (Blob) and backlog (metadata).
 // Shared by the service worker and extension pages (same extension origin).
+//
+// A backlog item holds an ordered list of 1-3 images (`imageIds`) that is sent as one
+// round, and the object names uploaded so far (`objectNames`, same order).
 
 const DB_NAME = 'chamber';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+
+// v1 items had a single `imageId` / `objectName`.
+function migrateV1(store) {
+  store.openCursor().onsuccess = (e) => {
+    const cur = e.target.result;
+    if (!cur) return;
+    const { imageId, objectName, ...rest } = cur.value;
+    if (!Array.isArray(rest.imageIds)) {
+      cur.update({ ...rest, imageIds: imageId ? [imageId] : [], objectNames: objectName ? [objectName] : [] });
+    }
+    cur.continue();
+  };
+}
 
 let dbPromise = null;
 
@@ -10,13 +26,15 @@ function open() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (e) => {
       const db = req.result;
       if (!db.objectStoreNames.contains('images')) db.createObjectStore('images', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('backlog')) {
         const s = db.createObjectStore('backlog', { keyPath: 'id' });
         s.createIndex('status', 'status');
         s.createIndex('createdAt', 'createdAt');
+      } else if (e.oldVersion < 2) {
+        migrateV1(req.transaction.objectStore('backlog'));
       }
     };
     req.onsuccess = () => {
@@ -57,24 +75,36 @@ export async function getImage(id) {
   return reqP(db.transaction('images').objectStore('images').get(id));
 }
 
-// Adds an image + backlog item atomically at the end of the queue.
+function putImages(tx, images, now) {
+  const store = tx.objectStore('images');
+  return images.map(({ blob, name }) => {
+    const id = uid();
+    store.put({ id, blob, name, mime: blob.type, byteLength: blob.size, createdAt: now });
+    return id;
+  });
+}
+
+function deleteImages(tx, ids) {
+  for (const id of ids || []) tx.objectStore('images').delete(id);
+}
+
+// Adds the images + one backlog item atomically at the end of the queue.
+// `images` is [{ blob, name }] in submission order.
 // `roundsAtQueue` is how many rounds the node had on the server when this drawing was
 // queued; reconcile uses it to notice a round submitted outside the extension.
-export async function addItem({ blob, name, assignmentId, nodeId, title, roundsAtQueue = null }) {
+export async function addItem({ images, assignmentId, nodeId, title, roundsAtQueue = null }) {
   const db = await open();
   const now = new Date().toISOString();
-  const imageId = uid();
   const existing = await listBacklog();
   const order = existing.reduce((m, i) => Math.max(m, i.order ?? 0), 0) + 1;
+  const tx = db.transaction(['images', 'backlog'], 'readwrite');
   const item = {
-    id: uid(), imageId, assignmentId: String(assignmentId), nodeId: nodeId === null ? null : String(nodeId),
-    title, status: 'queued', reason: null, objectName: null, submissionId: null, roundsBefore: null,
+    id: uid(), imageIds: putImages(tx, images, now), assignmentId: String(assignmentId), nodeId: nodeId === null ? null : String(nodeId),
+    title, status: 'queued', reason: null, objectNames: [], submissionId: null, roundsBefore: null,
     serverStatus: null, queuePosition: null, estimatedWaitMinutes: null,
     teacherFeedback: null, reviewFileUrls: [], attempts: 0, nextAttemptAt: null, roundsAtQueue,
     order, createdAt: now, updatedAt: now,
   };
-  const tx = db.transaction(['images', 'backlog'], 'readwrite');
-  tx.objectStore('images').put({ id: imageId, blob, name, mime: blob.type, byteLength: blob.size, createdAt: now });
   tx.objectStore('backlog').put(item);
   await done(tx);
   return item;
@@ -95,22 +125,20 @@ export async function patchItem(id, patch, expectStatus) {
   return result;
 }
 
-// Replace the drawing on an item (needs_revision / blocked / failed / queued) and queue it again.
-export async function replaceImage(id, blob, name, roundsAtQueue = null) {
+// Replace the images on an item (queued / needs_revision / blocked / failed) and queue it again.
+export async function replaceImages(id, images, roundsAtQueue = null) {
   const db = await open();
   const tx = db.transaction(['images', 'backlog'], 'readwrite');
   const backlog = tx.objectStore('backlog');
   const cur = await reqP(backlog.get(id));
-  if (!cur || ['uploading', 'submitting', 'pending'].includes(cur.status)) {
+  if (!cur || !['queued', 'needs_revision', 'blocked', 'failed'].includes(cur.status)) {
     tx.abort();
     return null;
   }
   const now = new Date().toISOString();
-  const imageId = uid();
-  tx.objectStore('images').delete(cur.imageId);
-  tx.objectStore('images').put({ id: imageId, blob, name, mime: blob.type, byteLength: blob.size, createdAt: now });
+  deleteImages(tx, cur.imageIds);
   const next = {
-    ...cur, imageId, status: 'queued', reason: null, objectName: null, submissionId: null, roundsBefore: null,
+    ...cur, imageIds: putImages(tx, images, now), status: 'queued', reason: null, objectNames: [], submissionId: null, roundsBefore: null,
     serverStatus: null, queuePosition: null, estimatedWaitMinutes: null, attempts: 0, nextAttemptAt: null,
     reasonDetail: null, roundsAtQueue, updatedAt: now,
   };
@@ -130,7 +158,7 @@ export async function removeItem(id) {
   }
   if (cur) {
     backlog.delete(id);
-    tx.objectStore('images').delete(cur.imageId);
+    deleteImages(tx, cur.imageIds);
   }
   await done(tx);
   return true;
@@ -149,13 +177,17 @@ export async function reorder(ids) {
   await done(tx);
 }
 
-// Queue a drawing for a node. If that node already has an item that came back or got
-// stuck, the new drawing replaces it instead of adding a stale duplicate.
-export async function enqueue({ blob, name, assignmentId, nodeId, title, roundsAtQueue = null }) {
+// Queue a drawing for a node. An item on that node that got stuck (blocked / failed) is
+// replaced instead of leaving a stale duplicate. Anything else on the node stays: the new
+// item is a follow-up, sent after the node's current round comes back (requirements R2).
+export async function enqueue({ images, assignmentId, nodeId, title, roundsAtQueue = null }) {
   const aid = String(assignmentId);
   const nid = nodeId === null ? null : String(nodeId);
   const stale = (await listBacklog()).find((i) => i.assignmentId === aid && i.nodeId === nid
-    && ['needs_revision', 'blocked', 'failed'].includes(i.status));
-  if (stale) return { item: await replaceImage(stale.id, blob, name, roundsAtQueue), replaced: true };
-  return { item: await addItem({ blob, name, assignmentId: aid, nodeId: nid, title, roundsAtQueue }), replaced: false };
+    && ['blocked', 'failed'].includes(i.status));
+  if (stale) {
+    const item = await replaceImages(stale.id, images, roundsAtQueue);
+    if (item) return { item, replaced: true };
+  }
+  return { item: await addItem({ images, assignmentId: aid, nodeId: nid, title, roundsAtQueue }), replaced: false };
 }

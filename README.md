@@ -22,12 +22,14 @@ After pulling new code, click the reload button on the extension's card in `chro
 
 ## Use
 
-- **On the site's assignment page.** Paste, drop or pick your image in the site's own upload box as usual, then click **加入 Chamber 队列** below the site's **提交作业** button. The image is queued for the node you are viewing and is submitted when a slot frees up. **提交作业** still submits immediately. If you queue a node and then also submit it directly on the site, the queued item stops and tells you instead of submitting a second time.
-- **Queue page.** Drop, paste or pick an image, choose the target node, and click **Add to queue**. Approved nodes, and assignments where nothing can be queued right now (closed, prerequisite missing, every open node locked or already queued), are hidden unless you tick **Show all**. Other nodes that cannot be submitted are greyed out; hover for the reason. A locked node can be queued if the node before it is already queued or under review; it waits until that node is approved.
+- **On the site.** Put your images in the site's own upload box as usual, then click **加入 Chamber 队列** instead of submitting. On an assignment page the button sits below **提交作业** (one image, like the site there); on the course learning page it appears inside the **确认提交作业** dialog and queues all of the dialog's images (up to 3) for the node the dialog names. The site's own buttons still submit immediately. If you queue a node and then also submit it directly on the site, the queued item stops and tells you instead of submitting a second time.
+- **Queue page.** Drop, paste or pick 1–3 images (PNG, JPG, WebP or GIF, 10 MB each; they go out together as one submission, in the order shown), choose the target node, and click **Add to queue**. Approved nodes, and assignments where nothing can be queued right now (closed, prerequisite missing, every open node locked or already queued), are hidden unless you tick **Show all**. Other nodes that cannot be submitted are greyed out; hover for the reason. A locked node can be queued if the node before it is already queued or under review; it waits until that node is approved.
 - **Submission order.** When a slot frees up, the next item is picked by: earliest deadline → revisions (a returned node blocks every later node) → required before optional → your own order. The queue page lists items in that order and tags them **Due MM-DD**, **Revision**, **Optional**. Drag (or Alt+↑/↓) to reorder within the same priority; Delete removes.
-- **Updating a queued drawing.** Queued items have **Replace image** on the queue page. Locked nodes queued behind an earlier node go out automatically once that node is approved, so if a returned earlier node means a later drawing needs changes, replace it before then.
+- **Updating a queued drawing.** Queued items have **Replace images** on the queue page. Locked nodes queued behind an earlier node go out automatically once that node is approved, so if a returned earlier node means a later drawing needs changes, replace it before then.
 - **Review hours.** TAs only review at certain times (measured from the review history: 10:00–15:00 and 18:00–23:00 Beijing time, every day). Outside them no slot can free up, so the regular check pauses, continuing 30 minutes past each window so a slot freed by the last review is still filled at once. Anything you do (adding an image, clicking the toolbar icon, Run one check now, visiting the site) still checks immediately, since the review queue is ordered by submission time. Edit the hours or turn this off under Controls; your local times are shown next to them.
-- **Revisions.** When a submission comes back as reviewed / returned / shelved, its item turns into **Revision** with the teacher's feedback and review images. The returned image is never sent again. Queue your revised drawing like any other (on the site or the queue page) and it replaces that item.
+- **Revisions.** When a submission comes back as reviewed / returned / shelved, its item turns into **Revision** with the teacher's feedback and review images. The returned images are never sent again. Queue your revised drawing like any other (on the site or the queue page); once it is sent, the returned item shows **Returned, followed up** and keeps the feedback.
+- **Follow-ups (nodes reviewed in several rounds).** A node that is in review, or already has items in the queue, still accepts new items, tagged **Follow-up**. Each goes out after the one before it, once the node comes back returned. If the node is approved first (the TA approved directly, or you stop there), the remaining follow-ups become **Not sent** and nothing waits on them; later nodes carry on. Write the "more to come" note on the drawing itself, as the site has no note field. See `docs/requirements.md` (R2).
+- **完整作业.** When every node of an assignment is approved and its 完整作业 has not been submitted, the queue page lists it as a reminder. Submit it on the site; it takes no review slot and the extension never submits it.
 - **Toolbar icon.** Opens the queue page (or switches to it if already open) and runs a check. Its badge shows slots in use (e.g. **1/2**), the number of items needing attention, **||** when paused, or a red **!** when the login has run out.
 - **Floating badge** in the bottom-right of the assignment page: hover it and click to open the queue page for that assignment. × hides it for the tab.
 
@@ -70,12 +72,18 @@ Verified against the live API and the site's front-end bundle. Keep this table u
 | Slot count | Submissions in `SUBMITTED` / `REVIEWING` take a slot. The site counts the last round per assignment; the extension counts the last round per node (can only over-count) |
 | Upload | `POST /api/files/upload`, multipart `file` + `prefix=assignments/`. `data` is an object; its `objectName` is what goes into `fileUrl` |
 | Submit | `POST .../submissions` when the node has no rounds yet, `PUT` when it has. Body `{ nodeId, fileUrl }` |
-| File size | The site caps images at 10 MB |
+| Several images | The learning page sends up to 3 images as one round: each is uploaded, and the object names are joined with `,` into `fileUrl`. Rounds list them in `fileUrls` / `fileObjectNames`. (How `fileObjectName` looks for such a round is unverified; matching splits on `,`.) The assignment page sends one image |
+| Images | PNG, JPEG, WebP, GIF (assignment page: no GIF), at most 10 MB each |
+| Notes | The submit body has no note field; students write notes on the drawing |
+| Catalog | `GET /api/student/courses/terms/{termId}/catalog`: the same assignments grouped into chapters (`groupTitle`), as on the learning page. Its submit dialog only shows chapter · type label · node title, so the extension resolves the node through this |
+| 完整作业 | After every node is approved (not for graduation projects): `POST`/`PUT`/`DELETE /student/assignments/{id}/final-submission` `{ fileUrl }`, shown as `finalSubmission` on the assignment. Takes no review slot. The extension only reminds |
+| Review queue | Pending rounds carry `queuePosition` and `estimatedWaitMinutes` |
 | Closed | `status === "CLOSED"`, or past `deadline` (term end date 23:59:59 if there is none) |
 | IDs | 19-digit strings, beyond JS safe integers; never convert to Number |
 | Times | Naive Beijing time, see above |
 | Grouping | All assignments sit under a single lesson in week 0, so the picker groups by assignment |
-| Assignment page | Current node: `.node-steps .node-step-title.active`; upload box `.upload-zone`; chosen image `img.upload-preview` (blob URL of the original file); submit button `.upload-section .submit-btn` |
+| Assignment page | `/student/assignment/{id}`. Current node: `.node-steps .node-step-title.active`; upload box `.upload-zone`; chosen image `img.upload-preview` (blob URL of the original file); submit button `.upload-section .submit-btn` |
+| Learning page | `/student/learning/{termId}`. Submit dialog: `.ant-modal .submit-confirm-body`, context tags `.submit-context .ctx-tag` (chapter, type label, node title), images `img.submit-confirm-preview` (blob URLs, in order) |
 
 ## Layout
 
@@ -87,6 +95,7 @@ extension/            the folder Chrome loads (runtime files only)
     target.js         site origin, auth key, status constants
     adapter.js        API client (envelope, error type, upload retry)
     model.js          pure helpers over the assignment tree
+    images.js         image rules (types, size, count)
     scheduler.js      pure: what to do this check, priority order, queue eligibility
     reconcile.js      pure: correct the local queue from platform data
     engine.js         one full check, all side effects injected (testable in Node)
@@ -98,6 +107,7 @@ extension/            the folder Chrome loads (runtime files only)
   ui/                 queue page
 test/                 node:test unit tests, incl. a fake platform for eviction, timeouts, 429, rejections
 tools/                generators for strings and icons
+docs/requirements.md  feature requirements beyond this README (several images, follow-ups, 完整作业)
 ```
 
 ## Development

@@ -11,10 +11,32 @@ import {
   nodeSubmissions,
   nodeStatus,
   findSubmissionByFile,
+  submissionHasFile,
   reviewFiles,
 } from './model.js';
 
-const TERMINAL = new Set(['done', 'failed']);
+// Final states. continued: returned, then a later item of ours went out on the same node.
+// skipped: never sent because the node was approved first.
+const TERMINAL = new Set(['done', 'failed', 'continued', 'skipped']);
+
+/**
+ * Ids of the rounds on this node that our own items made: those carrying files we
+ * uploaded, plus the in-doubt round of an item still `submitting` (the round at index
+ * roundsBefore, which trackedRound also adopts). Anything else was submitted elsewhere.
+ */
+function ownRoundIds(backlog, assignment, nodeId) {
+  const subs = nodeSubmissions(assignment, nodeId);
+  const aid = String(assignment.assignmentId);
+  const own = new Set();
+  for (const it of backlog) {
+    if (it.assignmentId !== aid || it.nodeId !== nodeId) continue;
+    for (const s of subs) if (submissionHasFile(s, it.objectNames)) own.add(String(s.submissionId));
+    if (it.status === 'submitting' && Number.isInteger(it.roundsBefore) && subs[it.roundsBefore]) {
+      own.add(String(subs[it.roundsBefore].submissionId));
+    }
+  }
+  return own;
+}
 
 function trackedRound(item, assignment) {
   const subs = nodeSubmissions(assignment, item.nodeId);
@@ -22,8 +44,8 @@ function trackedRound(item, assignment) {
     const byId = subs.find((s) => String(s.submissionId) === String(item.submissionId));
     if (byId) return byId;
   }
-  if (item.objectName) {
-    const byFile = findSubmissionByFile(assignment, item.nodeId, item.objectName);
+  if (item.objectNames?.length) {
+    const byFile = findSubmissionByFile(assignment, item.nodeId, item.objectNames);
     if (byFile) return byFile;
   }
   // A new round appeared on this node since we started submitting. Even if the file
@@ -96,7 +118,7 @@ export function reconcile({ target, term, backlog }) {
           push(item, { status: 'blocked', reason: 'reasonNodeChanged' });
         } else {
           // No new round exists: the request never landed. Safe to queue again; the
-          // uploaded objectName is kept and reused.
+          // uploaded objectNames are kept and reused.
           push(item, { status: 'queued', reason: 'reasonInterrupted', roundsBefore: null });
         }
         break;
@@ -106,25 +128,46 @@ export function reconcile({ target, term, backlog }) {
         break;
       case 'queued': {
         // Picked up by the SPA or a previous tick we lost track of?
-        const sub = item.objectName ? findSubmissionByFile(assignment, item.nodeId, item.objectName) : null;
-        if (sub) push(item, patchFromRound(target, item, sub));
-        else if (nodeStatus(assignment, node) === target.doneStatus) push(item, { status: 'blocked', reason: 'reasonApproved' });
-        else if (Number.isInteger(item.roundsAtQueue) && nodeSubmissions(assignment, item.nodeId).length > item.roundsAtQueue) {
-          // A round was submitted for this node outside the extension (e.g. the site's own
-          // submit button) after this drawing was queued. Sending ours as well would burn
-          // another round, so stop and let the user decide.
-          push(item, { status: 'blocked', reason: 'reasonSubmittedElsewhere' });
+        const sub = item.objectNames?.length ? findSubmissionByFile(assignment, item.nodeId, item.objectNames) : null;
+        if (sub) {
+          push(item, patchFromRound(target, item, sub));
+          break;
         }
+        // Approved before this item went out (the TA approved directly, or the student
+        // stopped there). Nothing can be sent to an approved node: retire the item
+        // instead of leaving it to block or wait (requirements R2.3).
+        if (nodeStatus(assignment, node) === target.doneStatus) {
+          push(item, { status: 'skipped', reason: 'reasonApprovedBeforeSent' });
+          break;
+        }
+        if (!Number.isInteger(item.roundsAtQueue)) break;
+        // Rounds added since this item was queued: our own items' rounds just move the
+        // baseline on (follow-ups, R2.5); any other round was submitted outside the
+        // extension (e.g. the site's own button), and sending ours too would burn another
+        // round, so stop and let the user decide.
+        const subs = nodeSubmissions(assignment, item.nodeId);
+        const own = ownRoundIds(backlog, assignment, item.nodeId);
+        let base = item.roundsAtQueue;
+        while (base < subs.length && own.has(String(subs[base].submissionId))) base++;
+        if (base < subs.length) push(item, { status: 'blocked', reason: 'reasonSubmittedElsewhere' });
+        else if (base !== item.roundsAtQueue) push(item, { roundsAtQueue: base });
         break;
       }
       case 'needs_revision': {
-        // Waits for the user, but the user may resubmit on the site itself. Follow the
-        // latest round from the returned one on, so a resubmission shows as pending and
-        // its approval as done instead of the item staying "returned" forever.
         const subs = nodeSubmissions(assignment, item.nodeId);
         const at = item.submissionId ? subs.findIndex((s) => String(s.submissionId) === String(item.submissionId)) : -1;
-        if (at >= 0) push(item, patchFromRound(target, item, subs[subs.length - 1]));
-        else if (nodeStatus(assignment, node) === target.doneStatus) push(item, { status: 'done', reason: null });
+        if (at >= 0) {
+          // A later item of ours went out on this node: this round has been followed up.
+          const own = ownRoundIds(backlog, assignment, item.nodeId);
+          if (subs.slice(at + 1).some((s) => own.has(String(s.submissionId)))) {
+            push(item, { status: 'continued', reason: null });
+          } else {
+            // Waits for the user, but the user may resubmit on the site itself. Follow the
+            // latest round from the returned one on, so a resubmission shows as pending and
+            // its approval as done instead of the item staying "returned" forever.
+            push(item, patchFromRound(target, item, subs[subs.length - 1]));
+          }
+        } else if (nodeStatus(assignment, node) === target.doneStatus) push(item, { status: 'done', reason: null });
         break;
       }
       default:

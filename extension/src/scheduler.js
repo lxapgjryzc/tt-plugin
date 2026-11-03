@@ -15,6 +15,8 @@ import {
 const ACTIVE = new Set(['uploading', 'submitting', 'pending']);
 // Feasibility failures that will clear up by themselves; the item keeps waiting.
 const TRANSIENT = new Set(['reasonLocked', 'reasonPendingOnNode']);
+// Not a block either: reconcile marks queued items on approved nodes as skipped.
+const LEFT_TO_RECONCILE = new Set(['reasonApproved']);
 
 export function byOrder(a, b) {
   return (a.order ?? 0) - (b.order ?? 0) || String(a.createdAt).localeCompare(String(b.createdAt));
@@ -92,6 +94,7 @@ export function schedule({ target, term, backlog, settings, now = Date.now(), ma
     const assignment = findAssignment(term, item.assignmentId);
     const feas = isSubmittable(target, term, assignment, item.nodeId, now);
     if (!feas.ok) {
+      if (LEFT_TO_RECONCILE.has(feas.reason)) continue;
       if (TRANSIENT.has(feas.reason)) notes[item.id] = feas.reason === 'reasonLocked' ? 'waitLocked' : 'waitNodePending';
       else blocks.push({ id: item.id, reason: feas.reason, detail: feas.detail ?? null });
       continue;
@@ -147,26 +150,38 @@ export function backoffMs(attempts, rand = Math.random) {
 
 /**
  * Can the user queue a drawing for this node right now? Client-side only, no network.
- * Returns { ok, reason?, detail?, chained? }. A locked node is allowed only when it is
- * chained behind the previous node, which is either queued here or under review.
+ * Returns { ok, reason?, detail?, chained?, followUp? }.
+ *
+ * followUp: the node has a round in review or items of ours still to go out; the new
+ *   item is sent after those, once the node's round comes back returned (requirements R2).
+ * chained:  the node is locked, but the node before it is queued here or under review;
+ *   the item waits until that node is approved.
  */
 export function canQueue(target, term, backlog, assignment, node) {
   if (!assignment) return { ok: false, reason: 'reasonAssignmentMissing' };
   const aid = String(assignment.assignmentId);
   const nodeId = node ? String(node.nodeId) : null;
-  const active = (i, nid) => i.assignmentId === aid && i.nodeId === nid && ACTIVE_OR_QUEUED.has(i.status);
-  if (backlog.some((i) => active(i, nodeId))) return { ok: false, reason: 'reasonAlreadyQueued' };
+  const ours = (nid) => backlog.some((i) => i.assignmentId === aid && i.nodeId === nid && ACTIVE_OR_QUEUED.has(i.status));
 
   const feas = isSubmittable(target, term, assignment, nodeId);
-  if (feas.ok) return { ok: true };
+  const followUp = ours(nodeId) || target.pendingStatuses.includes(nodeStatus(assignment, node));
+  const extra = followUp ? { followUp: true } : {};
+  if (feas.ok || feas.reason === 'reasonPendingOnNode') return { ok: true, ...extra };
   if (feas.reason !== 'reasonLocked') return { ok: false, reason: feas.reason, detail: feas.detail };
 
   const prev = (assignment.nodes || []).find((n) => n.nodeOrder === node.nodeOrder - 1);
   if (!prev) return { ok: false, reason: 'reasonLocked' };
-  const prevQueued = backlog.some((i) => active(i, String(prev.nodeId)));
   const prevPending = target.pendingStatuses.includes(nodeStatus(assignment, prev));
-  if (prevQueued || prevPending) return { ok: true, chained: true };
+  if (ours(String(prev.nodeId)) || prevPending) return { ok: true, chained: true, ...extra };
   return { ok: false, reason: 'reasonLockedNoChain' };
 }
 
 const ACTIVE_OR_QUEUED = new Set(['queued', 'uploading', 'submitting', 'pending']);
+
+// Items the user should look at (toolbar badge count). A returned item stops counting
+// once a follow-up for its node is queued or out (requirements R2.4).
+export function needsAttention(backlog) {
+  const followed = new Set(backlog.filter((i) => ACTIVE_OR_QUEUED.has(i.status)).map((i) => `${i.assignmentId}|${i.nodeId}`));
+  return backlog.filter((i) => ['blocked', 'failed'].includes(i.status)
+    || (i.status === 'needs_revision' && !followed.has(`${i.assignmentId}|${i.nodeId}`)));
+}

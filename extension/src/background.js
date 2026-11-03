@@ -4,8 +4,9 @@
 import { target } from './target.js';
 import { makeApi } from './adapter.js';
 import { runTick } from './engine.js';
-import { selectTerm, listAssignments, countPending, findAssignment, nodeSubmissions, label } from './model.js';
-import { canQueue } from './scheduler.js';
+import { selectTerm, listAssignments, countPending, findAssignment, findNode, nodeSubmissions, label, resolveDialogNode } from './model.js';
+import { canQueue, needsAttention } from './scheduler.js';
+import { imageSetProblem } from './images.js';
 import { loadMessages, format, PAGE_LOCALE } from './i18n.js';
 import { getToken, storeToken, usable } from './token-bridge.js';
 import { sessionState, tokenExpiry, fresherToken } from './session.js';
@@ -28,6 +29,7 @@ const deps = {
   audit: async (entry) => {
     await appendAudit(entry);
     if (entry.action === 'reconcile') notifyTransition(entry);
+    else if (entry.result === 'preflight: reasonApproved') notifyTransition({ itemId: entry.itemId, result: 'uploading -> skipped' });
   },
   // With automatic login on, a missing, expired or soon-expiring token triggers a login.
   getToken: async ({ fresh } = {}) => {
@@ -122,7 +124,7 @@ async function refreshBadge() {
   const [s, backlog, { [KEYS.snapshot]: snap, [KEYS.token]: token }] = await Promise.all([
     getSettings(), store.listBacklog(), chrome.storage.local.get([KEYS.snapshot, KEYS.token]),
   ]);
-  const revision = backlog.filter((i) => i.status === 'needs_revision' || i.status === 'blocked' || i.status === 'failed').length;
+  const revision = needsAttention(backlog).length;
   const loggedOut = ['expired', 'invalid', 'missing'].includes(sessionState({ token, sessionInvalid: s.sessionInvalid }));
   let text = '';
   if (loggedOut) text = '!';
@@ -167,15 +169,17 @@ async function checkSession() {
   });
 }
 
+const NOTIFY_TITLES = { done: 'notifyApproved', needs_revision: 'notifyRevision', skipped: 'notifySkipped' };
+
 async function notifyTransition(entry) {
   const to = entry.result.split(' -> ')[1];
-  if (!['needs_revision', 'done'].includes(to)) return;
+  if (!NOTIFY_TITLES[to]) return;
   const item = await store.getItem(entry.itemId);
   const messages = await loadMessages((await getSettings()).locale);
   chrome.notifications.create(`chamber-${entry.itemId}-${to}`, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/128.png'),
-    title: format(messages, to === 'done' ? 'notifyApproved' : 'notifyRevision'),
+    title: format(messages, NOTIFY_TITLES[to]),
     message: item?.title || '',
   });
 }
@@ -313,36 +317,35 @@ const handlers = {
   },
   'chamber:itemsChanged': async () => { await refreshBadge(); broadcast(); tickSoon(); return { ok: true }; },
   'chamber:openQueue': async ({ query }) => { await openQueue(query || ''); return { ok: true }; },
-  // From the site's own assignment page: queue the image the user put in the site's
-  // upload box for the node they are viewing. Same checks as the queue page.
-  'chamber:enqueue': async ({ assignmentId, nodeOrder, nodeTitle, dataUrl, name }, sender) => {
+  // From the site: queue the image(s) the user put in one of the site's upload boxes.
+  // `where` is { assignmentId, nodeOrder, nodeTitle } on the assignment page, or
+  // { termId, dialog: { chapterTitle, typeLabel, nodeTitle } } from the learning page's
+  // submit dialog. Same checks as the queue page.
+  'chamber:enqueue': async ({ where, images }, sender) => {
     if (!sender.url?.startsWith(target.base)) return { error: 'reasonAssignmentMissing' };
     const { term, error } = await loadTree();
     if (error) return { error };
-    const a = findAssignment(term, assignmentId);
-    if (!a) return { error: 'reasonAssignmentMissing' };
-    let node = null;
-    if ((a.nodes || []).length) {
-      node = a.nodes.find((n) => n.title === nodeTitle) || a.nodes.find((n) => n.nodeOrder === nodeOrder);
-      if (!node) return { error: 'reasonNodeMissing' };
-    }
-    const blob = await (await fetch(dataUrl)).blob();
-    if (!blob.type.startsWith('image/') || blob.size === 0) return { error: 'errNotImage' };
-    if (blob.size > target.maxUploadBytes) return { error: 'errTooLarge' };
+    const found = await locateNode(term, where || {});
+    if (found.error) return found;
+    const { assignment: a, node } = found;
+    const parts = [];
+    for (const img of images || []) parts.push({ blob: await (await fetch(img.dataUrl)).blob(), name: img.name });
+    const bad = imageSetProblem(target, parts.map((p) => p.blob));
+    if (bad) return { error: bad };
     const backlog = await store.listBacklog();
     const verdict = canQueue(target, term, backlog, a, node);
     if (!verdict.ok) return { error: verdict.reason, detail: verdict.detail ?? null };
     const nodeId = node ? String(node.nodeId) : null;
     const title = label(a, node);
     const { replaced } = await store.enqueue({
-      blob, name, assignmentId: String(a.assignmentId), nodeId, title, roundsAtQueue: nodeSubmissions(a, nodeId).length,
+      images: parts, assignmentId: String(a.assignmentId), nodeId, title, roundsAtQueue: nodeSubmissions(a, nodeId).length,
     });
     await chrome.storage.local.set({ 'chamber:lastPick': { assignmentId: String(a.assignmentId), nodeId, label: title } });
-    await appendAudit({ action: 'enqueue', assignmentId: String(a.assignmentId), nodeId, result: replaced ? 'replaced' : 'added', source: 'page' });
+    await appendAudit({ action: 'enqueue', assignmentId: String(a.assignmentId), nodeId, result: replaced ? 'replaced' : 'added', images: parts.length, source: 'page' });
     await refreshBadge();
     broadcast();
     tickSoon();
-    return { ok: true, title, replaced, chained: !!verdict.chained };
+    return { ok: true, title, replaced, chained: !!verdict.chained, followUp: !!verdict.followUp };
   },
   'chamber:lookup': async ({ assignmentId }) => {
     const { term, error } = await loadTree();
@@ -351,6 +354,31 @@ const handlers = {
     return a ? { title: a.title, nodes: (a.nodes || []).map((n) => ({ nodeId: n.nodeId, title: n.title, status: n.status, locked: n.locked })) } : { error: 'NOT_FOUND' };
   },
 };
+
+// Find the (assignment, node) a site page refers to. Returns { assignment, node } or { error }.
+async function locateNode(term, where) {
+  let assignmentId = where.assignmentId;
+  let nodeId;
+  if (where.dialog) {
+    if (String(where.termId) !== String(term.termId)) return { error: 'reasonOtherTerm' };
+    let catalog;
+    try {
+      catalog = await api.catalog(String(term.termId));
+    } catch (e) {
+      return { error: e?.message || String(e) };
+    }
+    const hit = resolveDialogNode(catalog, where.dialog);
+    if (hit.error) return hit;
+    ({ assignmentId, nodeId } = hit);
+  }
+  const a = findAssignment(term, assignmentId);
+  if (!a) return { error: 'reasonAssignmentMissing' };
+  if (!(a.nodes || []).length) return { assignment: a, node: null };
+  const node = where.dialog
+    ? findNode(a, nodeId)
+    : a.nodes.find((n) => n.title === where.nodeTitle) || a.nodes.find((n) => n.nodeOrder === where.nodeOrder);
+  return node ? { assignment: a, node } : { error: 'reasonNodeMissing' };
+}
 
 function fromExtensionPage(sender) {
   return sender.id === chrome.runtime.id && sender.url?.startsWith(chrome.runtime.getURL(''));

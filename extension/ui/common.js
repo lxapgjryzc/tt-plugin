@@ -64,6 +64,8 @@ const ITEM_STATUS = {
   done: ['stDone', 'strong'],
   blocked: ['stBlocked', 'accent'],
   failed: ['stFailed', 'accent'],
+  continued: ['stContinued', 'faint'],
+  skipped: ['stSkipped', 'faint'],
 };
 export function itemStatusText(status) {
   return t((ITEM_STATUS[status] || [status])[0]);

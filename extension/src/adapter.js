@@ -18,6 +18,7 @@ export function makePaths(target) {
   return {
     courses: () => `${api}/student/courses`,
     weeks: (termId) => `${api}/student/courses/terms/${encodeURIComponent(termId)}/weeks`,
+    catalog: (termId) => `${api}/student/courses/terms/${encodeURIComponent(termId)}/catalog`,
     upload: () => `${api}/files/upload`,
     login: () => `${api}/auth/password/login`,
     submissions: (assignmentId) => `${api}/student/assignments/${encodeURIComponent(assignmentId)}/submissions`,
@@ -73,8 +74,10 @@ export function makeApi(target, { fetchImpl = (...a) => fetch(...a), uploadRetry
 
     courses: () => request('GET', paths.courses()),
     weeks: (termId) => request('GET', paths.weeks(termId)),
+    // Same assignments as weeks(), grouped by chapter (`groupTitle`) like the learning page.
+    catalog: (termId) => request('GET', paths.catalog(termId)),
 
-    // Resolves with the server's objectName, which is what the SPA sends as `fileUrl`.
+    // Resolves with the server's objectName; the SPA sends these (comma-joined) as `fileUrl`.
     async upload(blob, filename) {
       const send = () => {
         const fd = new FormData();

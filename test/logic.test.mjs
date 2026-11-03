@@ -160,7 +160,7 @@ test('backoff stays within 800 ms .. 60 s', () => {
 test('reconcile: pending -> needs_revision with feedback, -> done', () => {
   const term = makeTerm();
   const s = addRound(term, ids.A1, ids.A1n2, 'SUBMITTED', { fileObjectName: 'assignments/me.jpg' });
-  const it = item({ status: 'pending', objectName: 'assignments/me.jpg' });
+  const it = item({ status: 'pending', objectNames: ['assignments/me.jpg'] });
   let p = reconcile({ target, term, backlog: [it] });
   assert.equal(p[0].patch.status, 'pending');
   assert.equal(p[0].patch.submissionId, s.submissionId);
@@ -177,7 +177,7 @@ test('reconcile: pending -> needs_revision with feedback, -> done', () => {
 test('reconcile: returned item follows a resubmission made on the site', () => {
   const term = makeTerm();
   const s = addRound(term, ids.A1, ids.A1n2, 'RETURNED', { fileObjectName: 'assignments/me.jpg' });
-  const it = item({ status: 'needs_revision', objectName: 'assignments/me.jpg', submissionId: s.submissionId });
+  const it = item({ status: 'needs_revision', objectNames: ['assignments/me.jpg'], submissionId: s.submissionId });
   for (const { patch } of reconcile({ target, term, backlog: [it] })) assert.equal(patch.status, 'needs_revision');
   const s2 = addRound(term, ids.A1, ids.A1n2, 'SUBMITTED', { fileObjectName: 'assignments/site.jpg' });
   let p = reconcile({ target, term, backlog: [it] });
@@ -195,34 +195,34 @@ test('reconcile: in-doubt submitting resolves from server state', () => {
   // landed, file matches
   let term = makeTerm();
   addRound(term, ids.A1, ids.A1n2, 'SUBMITTED', { fileObjectName: 'assignments/me.jpg' });
-  let p = reconcile({ target, term, backlog: [item({ status: 'submitting', objectName: 'assignments/me.jpg', roundsBefore: 0 })] });
+  let p = reconcile({ target, term, backlog: [item({ status: 'submitting', objectNames: ['assignments/me.jpg'], roundsBefore: 0 })] });
   assert.equal(p[0].patch.status, 'pending');
   // landed, file key unrecognisable: a new round still counts as ours
   term = makeTerm();
   addRound(term, ids.A1, ids.A1n2, 'SUBMITTED', { fileObjectName: 'weird' });
-  p = reconcile({ target, term, backlog: [item({ status: 'submitting', objectName: 'assignments/me.jpg', roundsBefore: 0 })] });
+  p = reconcile({ target, term, backlog: [item({ status: 'submitting', objectNames: ['assignments/me.jpg'], roundsBefore: 0 })] });
   assert.equal(p[0].patch.status, 'pending');
   // never landed
   term = makeTerm();
-  p = reconcile({ target, term, backlog: [item({ status: 'submitting', objectName: 'assignments/me.jpg', roundsBefore: 0 })] });
+  p = reconcile({ target, term, backlog: [item({ status: 'submitting', objectNames: ['assignments/me.jpg'], roundsBefore: 0 })] });
   assert.equal(p[0].patch.status, 'queued');
   // dead upload
   p = reconcile({ target, term, backlog: [item({ status: 'uploading' })] });
   assert.equal(p[0].patch.status, 'queued');
 });
 
-test('reconcile: queued item whose node got approved elsewhere is blocked', () => {
+test('reconcile: queued item whose node got approved is skipped, not blocked (R2.3)', () => {
   const term = makeTerm();
   addRound(term, ids.A1, ids.A1n2, 'APPROVED');
   const p = reconcile({ target, term, backlog: [item()] });
-  assert.equal(p[0].patch.status, 'blocked');
-  assert.equal(p[0].patch.reason, 'reasonApproved');
+  assert.equal(p[0].patch.status, 'skipped');
+  assert.equal(p[0].patch.reason, 'reasonApprovedBeforeSent');
 });
 
 test('reconcile is idempotent', () => {
   const term = makeTerm();
   addRound(term, ids.A1, ids.A1n2, 'SUBMITTED', { fileObjectName: 'f' });
-  const it = item({ status: 'pending', objectName: 'f' });
+  const it = item({ status: 'pending', objectNames: ['f'] });
   const [{ patch }] = reconcile({ target, term, backlog: [it] });
   assert.deepEqual(reconcile({ target, term, backlog: [{ ...it, ...patch }] }), []);
 });
@@ -273,15 +273,17 @@ test('reconcile: a round submitted on the site after queueing blocks the queued 
   assert.deepEqual(reconcile({ target, term, backlog: [item()] }), []);
 });
 
-test('canQueue: duplicates, locks and chaining', async () => {
+test('canQueue: follow-ups, locks and chaining', async () => {
   const { canQueue } = await import('../extension/src/scheduler.js');
   const term = makeTerm();
   const A1 = findAssignment(term, ids.A1);
-  const n2 = A1.nodes[1];
-  const n3 = A1.nodes[2];
+  const [n1, n2, n3] = A1.nodes;
   assert.deepEqual(canQueue(target, term, [], A1, n2), { ok: true });
-  assert.equal(canQueue(target, term, [item()], A1, n2).reason, 'reasonAlreadyQueued');
+  assert.deepEqual(canQueue(target, term, [item()], A1, n2), { ok: true, followUp: true }, 'a second item on a node is a follow-up');
   assert.equal(canQueue(target, term, [], A1, n3).reason, 'reasonLockedNoChain');
   assert.deepEqual(canQueue(target, term, [item()], A1, n3), { ok: true, chained: true });
-  assert.equal(canQueue(target, term, [item({ status: 'needs_revision' })], A1, n2).ok, true, 'a revision can be queued');
+  assert.deepEqual(canQueue(target, term, [item({ status: 'needs_revision' })], A1, n2), { ok: true }, 'a revision is not a follow-up');
+  assert.equal(canQueue(target, term, [], A1, n1).reason, 'reasonApproved', 'approved nodes cannot be queued');
+  addRound(term, ids.A1, ids.A1n2, 'REVIEWING');
+  assert.deepEqual(canQueue(target, term, [], A1, n2), { ok: true, followUp: true }, 'a node in review takes follow-ups');
 });

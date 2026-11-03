@@ -180,7 +180,7 @@
     "message": "选做"
   },
   "clearFinished": {
-    "message": "清除已通过"
+    "message": "清除已结束"
   },
   "moveUp": {
     "message": "上移"
@@ -191,8 +191,19 @@
   "retry": {
     "message": "重试"
   },
-  "replaceImage": {
+  "replaceImages": {
     "message": "更换图片"
+  },
+  "imageCount": {
+    "message": "共 $P1$ 张图片",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "followUpQueued": {
+    "message": "已排好后续提交"
   },
   "reviewImage": {
     "message": "批改图 $P1$",
@@ -209,21 +220,35 @@
     "message": "选择、拖入或粘贴图片"
   },
   "dropHint": {
-    "message": "拖入、粘贴或点击选择图片"
+    "message": "拖入、粘贴或点击选择图片，最多 3 张"
   },
   "dropSub": {
-    "message": "最大 10 MB"
+    "message": "作为一次提交一起发送。PNG、JPG、WebP 或 GIF，每张不超过 10 MB"
   },
-  "fileInfo": {
-    "message": "$P1$ · $P2$ MB",
+  "imagesInfo": {
+    "message": "$P1$ / $P2$ 张图片 · $P3$ MB",
     "placeholders": {
       "p1": {
         "content": "$1"
       },
       "p2": {
         "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
       }
     }
+  },
+  "imageN": {
+    "message": "第 $P1$ 张图片",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "removeImage": {
+    "message": "移除图片"
   },
   "searchNodes": {
     "message": "搜索作业和节点"
@@ -242,6 +267,12 @@
   },
   "chainedHint": {
     "message": "当前未解锁，会等上一节点通过后再提交。"
+  },
+  "followUp": {
+    "message": "后续提交"
+  },
+  "followUpHint": {
+    "message": "该节点正在批改或已在队列中；这份会排在后面，等节点被打回后再提交。如果节点先通过了，就不再提交。"
   },
   "noMatches": {
     "message": "没有匹配的节点。"
@@ -266,6 +297,12 @@
   },
   "errTooLarge": {
     "message": "图片超过 10 MB。"
+  },
+  "errImageType": {
+    "message": "仅支持 PNG、JPG、WebP、GIF 格式的图片。"
+  },
+  "errTooManyImages": {
+    "message": "每次提交最多 3 张图片，请先移除多余的图片。"
   },
   "errNoNode": {
     "message": "请选择目标节点。"
@@ -296,6 +333,12 @@
   },
   "stFailed": {
     "message": "失败"
+  },
+  "stContinued": {
+    "message": "已退回，已续交"
+  },
+  "stSkipped": {
+    "message": "未提交"
   },
   "nsSubmitted": {
     "message": "待批改"
@@ -369,8 +412,17 @@
   "reasonPendingOnNode": {
     "message": "该节点已在等待批改"
   },
-  "reasonAlreadyQueued": {
-    "message": "已在队列中"
+  "reasonApprovedBeforeSent": {
+    "message": "未提交：节点已先通过"
+  },
+  "reasonFinalSubmission": {
+    "message": "完整作业不能加入队列，请直接在网站上提交"
+  },
+  "reasonAmbiguousNode": {
+    "message": "无法确定是哪个节点，请在队列页添加"
+  },
+  "reasonOtherTerm": {
+    "message": "这不是扩展当前跟踪的学期"
   },
   "reasonNodeChanged": {
     "message": "平台上该节点已变化，请到平台确认"
@@ -403,7 +455,7 @@
     "message": "等待上一节点通过"
   },
   "waitNodePending": {
-    "message": "等待：该节点正在批改"
+    "message": "等待：该节点正在批改，被打回后提交"
   },
   "waitSameNode": {
     "message": "等待同一节点的前一项"
@@ -523,6 +575,12 @@
   "enqueuedChained": {
     "message": "已排在上一节点后面，等上一节点通过后自动提交。"
   },
+  "enqueuedFollowUp": {
+    "message": "已作为后续提交加入队列，等该节点被打回后自动提交；如果节点先通过了，就不再提交。"
+  },
+  "enqueuedCloseDialog": {
+    "message": "可以关闭此窗口了。"
+  },
   "enqueueFailed": {
     "message": "加入队列失败"
   },
@@ -622,5 +680,17 @@
   },
   "notifyApproved": {
     "message": "作业已通过"
+  },
+  "notifySkipped": {
+    "message": "节点已提前通过，后续提交未发送"
+  },
+  "finalDue": {
+    "message": "完整作业未提交"
+  },
+  "finalDueHint": {
+    "message": "这些作业的节点都已通过，请到网站提交完整作业；扩展不会替你排队提交。"
+  },
+  "openOnSite": {
+    "message": "在网站打开"
   }
 }

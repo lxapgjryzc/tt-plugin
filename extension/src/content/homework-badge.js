@@ -1,13 +1,17 @@
 // Content script on tenten.art. Three jobs:
 // 1. Hand the SPA's bearer token to the service worker (so ticks work after the tab closes).
 // 2. On an assignment page, show one floating pill that links into the queue.
-// 3. Below the site's own submit button, add an "add to queue" button: it queues the image the user
-//    put into the site's upload box for the node being viewed, instead of submitting now.
+// 3. Add an "add to queue" button next to the site's own submit controls, queuing what
+//    the user put in the site's upload box instead of submitting now:
+//    - assignment page: below the submit button, the one image in the upload box;
+//    - learning page: inside the submit confirmation dialog, all of its images (up to 3).
 // It never changes or restyles the platform's own controls.
 (() => {
   const AUTH_KEY = 'tenten-auth';
   const DISMISS_KEY = 'chamber-badge-dismissed';
   const ROUTE = /^\/student\/assignment\/(\d+)/;
+  const LEARNING = /^\/student\/learning\/(\d+)/;
+  const FINAL_STEP_TITLE = '完整作业'; // the site's extra step after all nodes; never queued
   const send = (msg) => chrome.runtime.sendMessage(msg).catch(() => null);
 
   // The site is Chinese-only, so injected UI uses the Chinese strings whatever the
@@ -182,42 +186,33 @@
     shown = null;
   }
 
-  // ---- "add to queue" next to the site's submit button --------------------
-  // The site shows the chosen image as img.upload-preview (a blob: URL of the original
-  // file). As a fallback, remember the last file pasted / dropped / picked there.
-  let lastFile = null;
-  const remember = (f) => { if (f && f.type?.startsWith('image/')) lastFile = f; };
-  document.addEventListener('paste', (e) => remember([...(e.clipboardData?.files || [])][0]), true);
-  document.addEventListener('drop', (e) => { if (e.target.closest?.('.upload-zone')) remember([...(e.dataTransfer?.files || [])][0]); }, true);
-  document.addEventListener('change', (e) => { if (e.target.closest?.('.upload-zone')) remember(e.target.files?.[0]); }, true);
+  // ---- "add to queue" next to the site's submit controls --------------------
+  // The site shows chosen images as blob: URLs of the original files. Files pasted,
+  // dropped or picked are remembered so queued images keep their names, and as a
+  // fallback for the assignment page.
+  const recent = [];
+  const remember = (files) => {
+    for (const f of [...(files || [])]) if (f?.type?.startsWith('image/')) recent.unshift(f);
+    recent.length = Math.min(recent.length, 12);
+  };
+  const inUpload = (e) => e.target.closest?.('.upload-zone, .upload-cell, .ant-modal');
+  document.addEventListener('paste', (e) => remember(e.clipboardData?.files), true);
+  document.addEventListener('drop', (e) => { if (inUpload(e)) remember(e.dataTransfer?.files); }, true);
+  document.addEventListener('change', (e) => { if (e.target.type === 'file') remember(e.target.files); }, true);
 
-  let enq = null; // { wrap, btn, note, busy }
+  const nameFor = (blob, i) => recent.find((f) => f.size === blob.size && f.type === blob.type)?.name
+    || `drawing-${i + 1}.${(blob.type.split('/')[1] || 'png')}`;
 
-  function buildEnqueue(submit) {
-    const wrap = el('div', { class: 'chamber-enqueue', style: 'margin-top:8px' });
-    const cls = submit.className.split(/\s+/).filter((c) => c && c !== 'submit-btn' && c !== 'ant-btn-primary');
-    const btn = el('button', { type: 'button', class: [...cls, 'ant-btn-default'].join(' ') });
-    btn.append(el('span', {}, t('enqueueOnPage')));
-    const note = el('div', { role: 'status', style: 'margin-top:8px;font-size:13px;line-height:1.5;min-height:20px;opacity:.85' });
-    btn.addEventListener('click', () => enqueueFromPage());
-    wrap.append(btn, note);
-    return { wrap, btn, note, busy: false };
-  }
-
-  function syncEnqueue(onAssignment) {
-    const submit = onAssignment ? document.querySelector('.upload-section .submit-btn') : null;
-    if (!submit) {
-      enq?.wrap.remove();
-      enq = null;
-      return;
+  async function blobsFrom(imgs) {
+    const out = [];
+    for (const [i, img] of imgs.entries()) {
+      const blob = await (await fetch(img.src)).blob();
+      if (blob.size) out.push({ blob, name: nameFor(blob, i) });
     }
-    if (!enq) enq = buildEnqueue(submit);
-    // The SPA may re-render its section; put the button back right after its submit button.
-    if (submit.nextElementSibling !== enq.wrap) submit.after(enq.wrap);
-    const preview = document.querySelector('.upload-section img.upload-preview');
-    enq.btn.disabled = enq.busy || !preview;
+    return out;
   }
 
+  // Assignment page: one image, node from the step bar.
   function currentNode() {
     const active = document.querySelector('.node-steps .node-step-title.active');
     if (!active) return { nodeTitle: null, nodeOrder: null };
@@ -226,15 +221,75 @@
     return { nodeTitle: active.textContent.trim(), nodeOrder: idx >= 0 ? idx + 1 : null };
   }
 
-  async function currentImage() {
-    const preview = document.querySelector('.upload-section img.upload-preview');
-    if (preview?.src) {
-      try {
-        const b = await (await fetch(preview.src)).blob();
-        if (b.size) return { blob: b, name: lastFile?.size === b.size ? lastFile.name : `drawing.${(b.type.split('/')[1] || 'png')}` };
-      } catch { /* fall back to the remembered file */ }
+  // Learning page dialog: "chapter · type · node" tags (node absent for node-less work).
+  function dialogContext(body) {
+    const [chapterTitle, typeLabel, nodeTitle] = [...body.querySelectorAll('.submit-context .ctx-tag')].map((n) => n.textContent.trim());
+    return { chapterTitle: chapterTitle ?? null, typeLabel: typeLabel ?? null, nodeTitle: nodeTitle ?? null };
+  }
+
+  const SLOTS = {
+    page: {
+      anchor: () => (ROUTE.test(location.pathname) ? document.querySelector('.upload-section .submit-btn') : null),
+      buttonClass: (anchor) => anchor.className.split(/\s+/).filter((c) => c && c !== 'submit-btn' && c !== 'ant-btn-primary'),
+      images: () => [...document.querySelectorAll('.upload-section img.upload-preview')],
+      refusal: () => null,
+      async collect(imgs) {
+        let images = await blobsFrom(imgs).catch(() => []);
+        if (!images.length && recent[0]) images = [{ blob: recent[0], name: recent[0].name }];
+        return { where: { assignmentId: ROUTE.exec(location.pathname)[1], ...currentNode() }, images };
+      },
+    },
+    dialog: {
+      anchor: () => (LEARNING.test(location.pathname) ? document.querySelector('.ant-modal .submit-confirm-body') : null),
+      buttonClass: (anchor) => {
+        const cancel = anchor.closest('.ant-modal')?.querySelector('.ant-modal-footer .ant-btn:not(.ant-btn-primary)');
+        return cancel ? cancel.className.split(/\s+/).filter(Boolean) : ['ant-btn'];
+      },
+      images: () => [...document.querySelectorAll('.ant-modal .submit-confirm-body img.submit-confirm-preview')],
+      refusal: (anchor) => (dialogContext(anchor).nodeTitle === FINAL_STEP_TITLE ? 'reasonFinalSubmission' : null),
+      async collect(imgs, anchor) {
+        return { where: { termId: LEARNING.exec(location.pathname)[1], dialog: dialogContext(anchor) }, images: await blobsFrom(imgs) };
+      },
+    },
+  };
+
+  const mounted = {}; // slot name -> { wrap, btn, note, busy, seen }
+
+  function build(slot, anchor) {
+    const wrap = el('div', { class: 'chamber-enqueue', style: 'margin-top:8px' });
+    const cls = [...new Set([...SLOTS[slot].buttonClass(anchor), 'ant-btn-default'])];
+    const btn = el('button', { type: 'button', class: cls.join(' ') });
+    btn.append(el('span', {}, t('enqueueOnPage')));
+    const note = el('div', { role: 'status', style: 'margin-top:8px;font-size:13px;line-height:1.5;min-height:20px;opacity:.85' });
+    btn.addEventListener('click', () => enqueueFrom(slot));
+    wrap.append(btn, note);
+    return { wrap, btn, note, busy: false, seen: '' };
+  }
+
+  function showNote(m, text, isError) {
+    m.note.textContent = text;
+    m.note.style.color = isError ? '#c2410c' : '';
+  }
+
+  function syncSlot(slot) {
+    const spec = SLOTS[slot];
+    const anchor = spec.anchor();
+    let m = mounted[slot];
+    if (!anchor) {
+      m?.wrap.remove();
+      delete mounted[slot];
+      return;
     }
-    return lastFile ? { blob: lastFile, name: lastFile.name } : null;
+    if (!m) m = mounted[slot] = build(slot, anchor);
+    // The SPA may re-render; keep the button right after its anchor.
+    if (anchor.nextElementSibling !== m.wrap) anchor.after(m.wrap);
+    const imgs = spec.images();
+    // A different set of images: the last note no longer applies.
+    const seen = imgs.map((i) => i.src).join('|');
+    if (seen !== m.seen && !m.busy) { m.seen = seen; showNote(m, '', false); }
+    const refusal = spec.refusal(anchor);
+    if (refusal && !m.busy) showNote(m, t(refusal), true);
+    m.btn.disabled = m.busy || !!refusal || !imgs.length;
   }
 
   const toDataUrl = (blob) => new Promise((resolve, reject) => {
@@ -244,32 +299,30 @@
     r.readAsDataURL(blob);
   });
 
-  function showNote(text, isError) {
-    if (!enq) return;
-    enq.note.textContent = text;
-    enq.note.style.color = isError ? '#c2410c' : '';
-  }
-
-  async function enqueueFromPage() {
-    const m = ROUTE.exec(location.pathname);
-    if (!m || !enq || enq.busy) return;
-    enq.busy = true;
-    enq.btn.disabled = true;
-    showNote(t('enqueueing'), false);
+  async function enqueueFrom(slot) {
+    const m = mounted[slot];
+    const anchor = SLOTS[slot].anchor();
+    if (!m || m.busy || !anchor) return;
+    m.busy = true;
+    m.btn.disabled = true;
+    showNote(m, t('enqueueing'), false);
     try {
-      const img = await currentImage();
-      if (!img) { showNote(t('errNoImage'), true); return; }
-      const res = await send({ type: 'chamber:enqueue', assignmentId: m[1], ...currentNode(), dataUrl: await toDataUrl(img.blob), name: img.name });
+      const { where, images } = await SLOTS[slot].collect(SLOTS[slot].images(), anchor);
+      if (!images.length) { showNote(m, t('errNoImage'), true); return; }
+      const payload = [];
+      for (const img of images) payload.push({ dataUrl: await toDataUrl(img.blob), name: img.name });
+      const res = await send({ type: 'chamber:enqueue', where, images: payload });
       if (res?.ok) {
-        showNote(t(res.chained ? 'enqueuedChained' : 'enqueuedOk'), false);
+        const key = res.followUp ? 'enqueuedFollowUp' : res.chained ? 'enqueuedChained' : 'enqueuedOk';
+        showNote(m, slot === 'dialog' ? `${t(key)} ${t('enqueuedCloseDialog')}` : t(key), false);
       } else {
         const key = res?.error === 'NO_TAB' || res?.error === 'SESSION_INVALID' ? 'sessionInvalid' : res?.error;
-        showNote(key ? `${t(key)}${res.detail ? `: ${res.detail}` : ''}` : t('enqueueFailed'), true);
+        showNote(m, key ? `${t(key)}${res.detail ? `: ${res.detail}` : ''}` : t('enqueueFailed'), true);
       }
     } catch (e) {
-      showNote(`${t('enqueueFailed')}: ${e?.message || e}`, true);
+      showNote(m, `${t('enqueueFailed')}: ${e?.message || e}`, true);
     } finally {
-      enq.busy = false;
+      m.busy = false;
     }
   }
 
@@ -278,9 +331,9 @@
   function check() {
     syncToken();
     syncTheme();
-    syncEnqueue(ROUTE.test(location.pathname));
+    for (const slot of Object.keys(SLOTS)) syncSlot(slot);
     if (location.pathname === lastPath) return;
-    if (enq) showNote('', false);
+    for (const m of Object.values(mounted)) showNote(m, '', false);
     lastPath = location.pathname;
     restoreSiteLogin();
     send({ type: 'chamber:pageNav' });

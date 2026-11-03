@@ -56,7 +56,7 @@ test('worker killed after the POST landed -> no duplicate on the next tick', asy
 test('worker killed before the request was sent -> submitted once later', async () => {
   const term = makeTerm();
   const api = fakeServer(term);
-  const it = item({ status: 'submitting', objectName: 'assignments/u.jpg', roundsBefore: 0 });
+  const it = item({ status: 'submitting', objectNames: ['assignments/u.jpg'], roundsBefore: 0 });
   const deps = fakeDeps(api, [it]);
   await runTick(deps);
   assert.equal(api.calls.post, 1);
@@ -199,7 +199,7 @@ test('queued chain survives a returned first node: later nodes wait, nothing is 
   assert.equal(deps.snapshots.at(-1).notes[n2.id], 'waitLocked');
   assert.equal(api.calls.post + api.calls.put, 1, 'nothing else was sent');
   // user queues a revised node 1 (replaces the item), it goes out as a new round
-  deps.items.set(n1.id, { ...deps.items.get(n1.id), status: 'queued', objectName: null, roundsAtQueue: 1 });
+  deps.items.set(n1.id, { ...deps.items.get(n1.id), status: 'queued', objectNames: [], roundsAtQueue: 1 });
   deps.advance(60_000); await runTick(deps);
   assert.equal(api.calls.put, 1, 'revision sent once as PUT');
   // approved -> node 2 unlocks and goes out

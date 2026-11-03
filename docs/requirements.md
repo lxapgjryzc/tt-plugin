@@ -154,9 +154,33 @@ parameter for the node. Which node is shown is page state, set by clicking a ste
 
 ---
 
+## R5. Queue page sections
+
+### Background
+
+Items stay in storage after they are sent: they follow the round to its result (feedback,
+notifications), anchor follow-ups (R2) and the duplicate guard. Showing them in the backlog
+made sent work look unsent, and listed it twice next to *In review*. This is display only;
+stored items and scheduling do not change.
+
+### Requirements
+
+- **R5.1 Backlog** lists items not sent yet or needing the user: queued, uploading,
+  submitting, blocked, failed, and returned (Revision). Reordering acts on this list.
+- **R5.2 In review** lists every pending round on the platform (also those submitted on the
+  site). A round sent by the extension shows the item's thumbnail and image count, how many
+  follow-ups are queued behind it, and *Stop tracking* (never withdraws). Items of ours in
+  review that the last check has not reported yet are listed too.
+- **R5.3 Finished** (approved, followed up, not sent) is a collapsed section with its count
+  and *Clear finished*; hidden when empty.
+
+---
+
 ## Out of scope
 
 - Withdrawing submissions (deliberately never done).
-- Replacing a round that is still in review (the site allows a `PUT` over it; the server's
-  exact behaviour is unverified, and it would bypass R2.2).
+- Replacing the images of a round in review. The site has no such call: a SUBMITTED round
+  can only be withdrawn (`DELETE`, the round disappears) and submitted again, which puts it
+  at the back of the review queue; a REVIEWING round cannot be touched. The extension never
+  withdraws.
 - Grouping the node picker by chapter.

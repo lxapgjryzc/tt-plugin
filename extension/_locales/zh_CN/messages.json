@@ -182,6 +182,17 @@
   "clearFinished": {
     "message": "清除已结束"
   },
+  "finished": {
+    "message": "已结束"
+  },
+  "followUpsBehind": {
+    "message": "后面还排着 $P1$ 份",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "moveUp": {
     "message": "上移"
   },

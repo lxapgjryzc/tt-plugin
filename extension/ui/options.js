@@ -128,8 +128,11 @@ async function itemsChanged() {
   await refresh();
 }
 
+// Ids of the backlog list in the order shown (R5.1); reordering only acts on these.
+const queueIds = () => state.backlog.filter((i) => IN_BACKLOG.has(i.status)).map((i) => i.id);
+
 async function move(id, delta) {
-  const ids = state.backlog.map((i) => i.id);
+  const ids = queueIds();
   const at = ids.indexOf(id);
   const to = at + delta;
   if (at < 0 || to < 0 || to >= ids.length) return;
@@ -139,7 +142,7 @@ async function move(id, delta) {
   document.querySelector(`li.row[data-id="${id}"]`)?.focus();
 }
 
-function itemRow(item, index) {
+function itemRow(item, index, list) {
   const busy = item.status === 'uploading' || item.status === 'submitting';
   const notes = state.snap?.notes || {};
   const sub = el('div', { class: 'sub' }, itemTag(item.status));
@@ -150,7 +153,6 @@ function itemRow(item, index) {
     if (p.optional) sub.append(el('span', { class: 'tag', 'data-tone': 'faint', text: t('prioOptional') }));
   }
   if (item.status === 'queued' && notes[item.id]) sub.append(t(notes[item.id]));
-  if (item.status === 'pending') sub.append(queueText(item.queuePosition, item.estimatedWaitMinutes));
 
   if (item.status === 'needs_revision' && followedUp(item)) sub.append(t('followUpQueued'));
 
@@ -189,8 +191,8 @@ function itemRow(item, index) {
     actions.childElementCount ? actions : null),
   el('div', { class: 'tools' },
     el('button', { class: 'icon', type: 'button', title: t('moveUp'), 'aria-label': t('moveUp'), disabled: index === 0, onclick: () => move(item.id, -1) }, icon('up')),
-    el('button', { class: 'icon', type: 'button', title: t('moveDown'), 'aria-label': t('moveDown'), disabled: index === state.backlog.length - 1, onclick: () => move(item.id, 1) }, icon('down')),
-    el('button', { class: 'icon', type: 'button', title: t(item.status === 'pending' ? 'stopTracking' : 'remove'), 'aria-label': t('removeItem', [item.title]), disabled: busy, onclick: () => remove(item) }, icon('x'))));
+    el('button', { class: 'icon', type: 'button', title: t('moveDown'), 'aria-label': t('moveDown'), disabled: index === list.length - 1, onclick: () => move(item.id, 1) }, icon('down')),
+    el('button', { class: 'icon', type: 'button', title: t('remove'), 'aria-label': t('removeItem', [item.title]), disabled: busy, onclick: () => remove(item) }, icon('x'))));
 
   wireDrag(li, item.id);
   return li;
@@ -218,7 +220,7 @@ function wireDrag(li, id) {
     e.preventDefault();
     const after = li.classList.contains('drop-after');
     clearDropMarks();
-    const ids = state.backlog.map((i) => i.id).filter((x) => x !== dragId);
+    const ids = queueIds().filter((x) => x !== dragId);
     ids.splice(ids.indexOf(id) + (after ? 1 : 0), 0, dragId);
     await store.reorder(ids);
     await itemsChanged();
@@ -248,22 +250,32 @@ function pickReplacement(id) {
   $('replaceFile').click();
 }
 
+// Sections of the queue page (requirements R5). Items keep being stored after they are
+// sent; only where they are shown depends on their status.
+const IN_BACKLOG = new Set(['queued', 'uploading', 'submitting', 'blocked', 'failed', 'needs_revision']);
+const WAITING = new Set(['queued', 'uploading', 'submitting']);
+const nodeKey = (x) => `${x.assignmentId}|${x.nodeId ?? null}`;
+
 function renderBacklog() {
   gcThumbs();
   const list = $('backlogList');
   const focused = document.activeElement?.closest?.('li.row')?.dataset.id;
-  list.replaceChildren(...state.backlog.map(itemRow));
+  const queue = state.backlog.filter((i) => IN_BACKLOG.has(i.status));
+  list.replaceChildren(...queue.map((item, i) => itemRow(item, i, queue)));
   if (focused) list.querySelector(`li.row[data-id="${focused}"]`)?.focus();
-  $('backlogEmpty').hidden = state.backlog.length > 0;
-  $('clearDone').hidden = !state.backlog.some((i) => FINISHED.has(i.status));
+  $('backlogEmpty').hidden = queue.length > 0;
 
-  // In review: server truth, including rounds submitted outside the extension.
-  const pend = state.snap?.pending || [];
-  $('reviewList').replaceChildren(...pend.map((p) => el('li', { class: 'row' },
-    el('div', { class: 'main' },
-      p.assignmentId ? siteLink(siteNodeUrl(target, p.assignmentId, p.nodeId), p.label) : el('div', { class: 'title', text: p.label }),
-      el('div', { class: 'sub' }, nodeTag(p.status, false), queueText(p.queuePosition, p.estimatedWaitMinutes))))));
-  $('reviewEmpty').hidden = pend.length > 0;
+  renderReview();
+
+  const finished = state.backlog.filter((i) => FINISHED.has(i.status));
+  $('finished').hidden = !finished.length;
+  $('finishedCount').textContent = String(finished.length);
+  $('finishedList').replaceChildren(...finished.map((item) => compactRow(item, {
+    sub: [itemTag(item.status)],
+    reason: item.status === 'skipped' ? reasonText(item.reason) : null,
+    feedback: item.teacherFeedback,
+    removeTitle: t('remove'),
+  })));
 
   // 完整作业 not submitted yet: a reminder only, the extension never submits it (R3).
   const due = state.term ? finalSubmissionsDue(state.term) : [];
@@ -277,6 +289,46 @@ function renderBacklog() {
 // A node or assignment name that opens it on the site in a new tab (requirements R4).
 function siteLink(href, text) {
   return el('a', { class: 'title site-link', href, target: '_blank', rel: 'noreferrer', title: t('openOnSite'), text });
+}
+
+// In review (R5.2): every pending round on the platform, with our own item's images and
+// follow-ups when the extension sent it. Our pending items the last check has not
+// reported yet are listed as well.
+function renderReview() {
+  const pend = state.snap?.pending || [];
+  const ours = new Map(state.backlog.filter((i) => i.status === 'pending').map((i) => [nodeKey(i), i]));
+  const rows = pend.map((p) => {
+    const item = ours.get(nodeKey(p));
+    ours.delete(nodeKey(p));
+    return { p, item };
+  });
+  for (const item of ours.values()) rows.push({ p: null, item });
+
+  $('reviewList').replaceChildren(...rows.map(({ p, item }) => {
+    const status = p?.status ?? item.serverStatus;
+    const sub = [nodeTag(status, false), queueText(p?.queuePosition ?? item?.queuePosition, p?.estimatedWaitMinutes ?? item?.estimatedWaitMinutes)];
+    const behind = state.backlog.filter((i) => WAITING.has(i.status) && nodeKey(i) === nodeKey(p ?? item)).length;
+    if (behind) sub.push(el('span', { class: 'tag', 'data-tone': 'faint', text: t('followUpsBehind', [String(behind)]) }));
+    if (item) return compactRow(item, { title: p?.label, sub, removeTitle: t('stopTracking') });
+    return el('li', { class: 'row' },
+      el('div', { class: 'main' },
+        p.assignmentId ? siteLink(siteNodeUrl(target, p.assignmentId, p.nodeId), p.label) : el('div', { class: 'title', text: p.label }),
+        el('div', { class: 'sub' }, ...sub)));
+  }));
+  $('reviewEmpty').hidden = rows.length > 0;
+}
+
+// A row for an item outside the backlog: no reordering, only removal.
+function compactRow(item, { title, sub = [], reason = null, feedback = null, removeTitle }) {
+  return el('li', { class: 'row', 'data-id': item.id },
+    thumbFor(item),
+    el('div', { class: 'main' },
+      siteLink(siteNodeUrl(target, item.assignmentId, item.nodeId), title || item.title),
+      el('div', { class: 'sub' }, ...sub),
+      reason ? el('div', { class: 'reason', text: reason }) : null,
+      feedback ? el('div', { class: 'feedback', text: feedback }) : null),
+    el('div', { class: 'tools' },
+      el('button', { class: 'icon', type: 'button', title: removeTitle, 'aria-label': t('removeItem', [item.title]), onclick: () => remove(item) }, icon('x'))));
 }
 
 // Items that are over: removed by "Clear finished".
@@ -563,7 +615,8 @@ function wire() {
   $('finalOpen').addEventListener('click', () => {
     chrome.tabs.create({ url: siteLearningUrl(target, state.term?.termId) });
   });
-  $('clearDone').addEventListener('click', async () => {
+  $('clearDone').addEventListener('click', async (e) => {
+    e.preventDefault(); // it sits in the section's <summary>; do not toggle it
     for (const i of state.backlog.filter((x) => FINISHED.has(x.status))) await store.removeItem(i.id);
     await itemsChanged();
   });

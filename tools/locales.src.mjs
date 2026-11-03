@@ -49,6 +49,8 @@ export default [
   ['prioRevision', 'Revision', '修改稿'],
   ['prioOptional', 'Optional', '选做'],
   ['clearFinished', 'Clear finished', '清除已结束'],
+  ['finished', 'Finished', '已结束'],
+  ['followUpsBehind', '$1 follow-up(s) queued', '后面还排着 $1 份'],
   ['moveUp', 'Move up', '上移'],
   ['moveDown', 'Move down', '下移'],
   ['retry', 'Retry', '重试'],

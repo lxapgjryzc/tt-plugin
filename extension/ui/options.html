@@ -76,7 +76,6 @@
       <section class="col backlog" aria-labelledby="backlogLabel">
         <div class="col-head">
           <h2 id="backlogLabel" class="label" data-i18n="backlog"></h2>
-          <button id="clearDone" type="button" class="link" data-i18n="clearFinished" hidden></button>
         </div>
         <p class="muted hint" data-i18n="reorderHint"></p>
         <ol id="backlogList" class="rows" aria-labelledby="backlogLabel"></ol>
@@ -85,6 +84,14 @@
         <h2 class="label section-gap" data-i18n="inReview"></h2>
         <ul id="reviewList" class="rows"></ul>
         <p id="reviewEmpty" class="muted empty" data-i18n="noneInReview" hidden></p>
+
+        <details id="finished" class="finished section-gap" hidden>
+          <summary class="col-head">
+            <span class="label"><span data-i18n="finished"></span> · <span id="finishedCount"></span></span>
+            <button id="clearDone" type="button" class="link" data-i18n="clearFinished"></button>
+          </summary>
+          <ul id="finishedList" class="rows"></ul>
+        </details>
 
         <div id="finalDue" hidden>
           <div class="col-head section-gap">

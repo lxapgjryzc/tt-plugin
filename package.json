@@ -3,8 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "node app/main.mjs",
+    "autostart:on": "node tools/autostart.mjs on",
+    "autostart:off": "node tools/autostart.mjs off",
     "test": "node --test test/*.test.mjs",
     "locales": "node tools/build-locales.mjs",
     "icons": "node tools/make-icons.mjs"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

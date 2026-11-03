@@ -1,16 +1,74 @@
-// Shared helpers for extension pages. All copy comes from _locales via t().
+// Shared helpers for the queue page, served by the app (requirements R9.11). All copy
+// comes from _locales via t(); all data goes through the app's local API.
 
 import { target } from '../src/target.js';
 import { loadMessages, format, effectiveLocale } from '../src/i18n.js';
-import { getSettings } from '../src/storage/settings.js';
+
+// The app embeds its API key in this page's HTML (R9.12).
+const KEY = document.querySelector('meta[name="chamber-key"]')?.content || '';
 
 let messages = null;
 let locale = 'auto';
 
+// Set when the app cannot be reached (it was quit or crashed); the page shows a banner.
+export const connection = { down: false, onChange: () => {} };
+function setDown(down) {
+  if (connection.down === down) return;
+  connection.down = down;
+  connection.onChange(down);
+}
+
+async function request(path, init = {}) {
+  let res;
+  try {
+    res = await fetch(path, { ...init, headers: { 'X-Chamber-Key': KEY, ...(init.headers || {}) } });
+  } catch (e) {
+    setDown(true);
+    throw e;
+  }
+  setDown(false);
+  return res;
+}
+
+// Call a queue-page handler of the app. Resolves with its JSON result.
+export async function send(type, payload = {}) {
+  const res = await request(`/api/call/${type}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
+  return body;
+}
+
+// Store one image file in the app ahead of queuing it; resolves with its id.
+export async function stageImage(file, name) {
+  const res = await request('/api/images', {
+    method: 'POST', body: file, headers: { 'Content-Type': file.type, 'X-File-Name': encodeURIComponent(name) },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()).id;
+}
+
+// An image's stored thumbnail ('thumb') or original ('data') as a Blob, or null.
+export async function imageBlob(id, which) {
+  const res = await request(`/api/images/${encodeURIComponent(id)}${which === 'thumb' ? '/thumb' : ''}`);
+  return res.ok ? res.blob() : null;
+}
+
+export async function saveThumb(id, blob) {
+  await request(`/api/images/${encodeURIComponent(id)}/thumb`, { method: 'PUT', body: blob });
+}
+
+const readLocale = async (l) => {
+  const res = await fetch(`/_locales/${l}/messages.json`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+};
+
 // Call once before rendering: loads the language chosen in settings.
 export async function initI18n() {
-  locale = (await getSettings()).locale;
-  messages = await loadMessages(locale);
+  try { locale = (await send('state')).settings.locale; } catch { locale = 'auto'; }
+  messages = await loadMessages(locale, navigator.language, readLocale);
 }
 
 export const t = (key, subs) => format(messages, key, subs);
@@ -20,10 +78,8 @@ export function applyI18n(root = document) {
   for (const n of root.querySelectorAll('[data-i18n-title]')) n.title = t(n.dataset.i18nTitle);
   for (const n of root.querySelectorAll('[data-i18n-aria]')) n.setAttribute('aria-label', t(n.dataset.i18nAria));
   for (const n of root.querySelectorAll('[data-i18n-placeholder]')) n.placeholder = t(n.dataset.i18nPlaceholder);
-  document.documentElement.lang = effectiveLocale(locale);
+  document.documentElement.lang = effectiveLocale(locale, navigator.language);
 }
-
-export const send = (type, payload = {}) => chrome.runtime.sendMessage({ type, ...payload });
 
 export function el(tag, attrs = {}, ...children) {
   const e = document.createElement(tag);
@@ -134,18 +190,34 @@ export function renderPips(container, used, limit) {
   container.setAttribute('aria-label', t('slotsFree', [String(Math.max(0, limit - used)), String(limit)]));
 }
 
-// Re-render on any backend change.
+// Re-render on any change in the app (server-sent events over fetch, so the key can go in
+// a header). Reconnects after the app restarts.
 export function onChanged(fn) {
   let timer = null;
   const fire = () => { clearTimeout(timer); timer = setTimeout(fn, 50); };
-  chrome.runtime.onMessage.addListener((m) => { if (m?.type === 'chamber:changed') fire(); });
-  chrome.storage.onChanged.addListener((changes) => {
-    if (Object.keys(changes).some((k) => k.startsWith('chamber:'))) fire();
-  });
+  (async function listen() {
+    for (;;) {
+      try {
+        const res = await request('/api/events');
+        if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+        fire(); // catch up on anything missed while disconnected
+        const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value.includes('data:')) fire();
+        }
+        setDown(true);
+      } catch {
+        setDown(true);
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  })();
 }
 
 export function openSite() {
-  chrome.tabs.create({ url: `${target.base}/` });
+  window.open(`${target.base}/`, '_blank', 'noopener');
 }
 
 export function why(key) {

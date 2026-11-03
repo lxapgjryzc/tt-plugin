@@ -203,7 +203,7 @@ it must be at least as guarded as submitting.
   images are chosen and checked (R1.2) *before* the confirmation, so cancelling the file
   dialog never withdraws anything. Nothing else in the extension ever withdraws: no
   automatic path, no retry.
-- **R6.3 Guarded write.** The service worker performs it while holding the tick lock (so no
+- **R6.3 Guarded write.** The app performs it while holding the tick lock (so no
   check can submit to the node meanwhile), re-reads the platform right before the request,
   and sends the `DELETE` only if the node's latest round is still exactly the confirmed one
   (same `submissionId`) and still SUBMITTED. Otherwise it refuses with the reason (review

@@ -1,8 +1,7 @@
 import {
-  t, initI18n, applyI18n, send, el, icon, itemTag, itemStatusText, nodeTag, TYPE_KEYS, reasonText, queueText, relTime, renderPips, onChanged, openSite, why,
+  t, initI18n, applyI18n, send, stageImage, imageBlob, saveThumb, connection,
+  el, icon, itemTag, itemStatusText, nodeTag, TYPE_KEYS, reasonText, queueText, relTime, renderPips, onChanged, openSite, why,
 } from './common.js';
-import * as store from '../src/storage/idb.js';
-import { KEYS, getSettings, getAudit } from '../src/storage/settings.js';
 import { target } from '../src/target.js';
 import {
   listAssignments, findAssignment, findNode, nodeStatus, nodeSubmissions, label, finalSubmissionsDue, siteNodeUrl, siteLearningUrl,
@@ -44,7 +43,7 @@ function pickState(assignment, node) {
 async function loadTree(force = false) {
   if (!force && Date.now() - state.treeAt < TREE_TTL) return;
   state.treeAt = Date.now();
-  const res = await send('chamber:tree');
+  const res = await send('tree');
   state.treeError = res?.error || null;
   if (res?.term) state.term = res.term;
   if (res?.courses?.length && res.term) {
@@ -53,11 +52,11 @@ async function loadTree(force = false) {
 }
 
 async function loadLocal() {
-  const [settings, backlog, local] = await Promise.all([getSettings(), store.listBacklog(), chrome.storage.local.get([KEYS.snapshot, KEYS.lastTick])]);
+  const { settings, backlog, snapshot, lastTick } = await send('state');
   state.settings = settings;
   state.backlog = backlog;
-  state.snap = local[KEYS.snapshot] || null;
-  state.lastTick = local[KEYS.lastTick] || null;
+  state.snap = snapshot;
+  state.lastTick = lastTick;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,12 +72,7 @@ function renderHeader() {
   if (state.lastTick?.at) parts.push(t('lastChecked', [relTime(state.lastTick.at)]));
   $('whyText').textContent = parts.filter(Boolean).join(' · ');
 
-  const err = state.treeError || snap?.error;
-  const needsLogin = err === 'NO_TAB' || err === 'SESSION_INVALID' || settings.sessionInvalid;
-  $('banner').hidden = !needsLogin && !err;
-  $('bannerAction').hidden = !needsLogin;
-  if (needsLogin) $('bannerText').textContent = t(settings.sessionInvalid || err === 'SESSION_INVALID' ? 'sessionInvalid' : 'noTab');
-  else if (err) $('bannerText').textContent = t('loadError', [String(err)]);
+  renderBanner();
 
   $('pauseBtn').textContent = t(settings.paused ? 'resumeAll' : 'pauseAll');
   $('pauseBtn').classList.toggle('danger', settings.paused);
@@ -95,6 +89,24 @@ function renderHeader() {
   $('runOnce').disabled = settings.paused;
 }
 
+function renderBanner() {
+  const { snap, settings } = state;
+  // The app was quit or crashed: nothing on this page works until it is back (R9.11).
+  if (connection.down) {
+    $('banner').hidden = false;
+    $('bannerAction').hidden = true;
+    $('bannerText').textContent = t('appStopped');
+    return;
+  }
+  if (!settings) return;
+  const err = state.treeError || snap?.error;
+  const needsLogin = err === 'NO_TAB' || err === 'SESSION_INVALID' || settings.sessionInvalid;
+  $('banner').hidden = !needsLogin && !err;
+  $('bannerAction').hidden = !needsLogin;
+  if (needsLogin) $('bannerText').textContent = t(settings.sessionInvalid || err === 'SESSION_INVALID' ? 'sessionInvalid' : 'noTab');
+  else if (err) $('bannerText').textContent = t('loadError', [String(err)]);
+}
+
 // ---------------------------------------------------------------------------
 // Backlog
 
@@ -103,17 +115,19 @@ function renderHeader() {
 function storedThumbUrl(imageId) {
   if (!state.thumbs.has(imageId)) {
     state.thumbs.set(imageId, (async () => {
-      const rec = await store.getImage(imageId);
-      let thumb = rec?.thumb;
-      if (!thumb && rec?.blob) {
+      let thumb = await imageBlob(imageId, 'thumb').catch(() => null);
+      if (!thumb) {
+        // Made here, where images can be decoded, and stored by the app (R9.13).
+        const original = await imageBlob(imageId, 'data').catch(() => null);
+        if (!original) return null;
         try {
-          thumb = await makeThumb(rec.blob);
-          await store.setThumb(imageId, thumb);
+          thumb = await makeThumb(original);
         } catch {
           return null; // not decodable: placeholder (R8.5)
         }
+        await saveThumb(imageId, thumb).catch(() => {});
       }
-      return thumb ? URL.createObjectURL(thumb) : null;
+      return URL.createObjectURL(thumb);
     })());
   }
   return state.thumbs.get(imageId);
@@ -148,9 +162,14 @@ function gcThumbs() {
 const fileThumbUrl = (file) => makeThumb(file).then((thumb) => URL.createObjectURL(thumb), () => null);
 const revoke = (p) => p?.then((url) => url && URL.revokeObjectURL(url));
 
-async function itemsChanged() {
-  await send('chamber:itemsChanged');
-  await refresh();
+// The app broadcasts every change and checks soon after; refresh right away anyway.
+const itemsChanged = () => refresh();
+
+// Store files in the app ahead of queuing them; resolves with their ids, in order.
+async function stageFiles(files) {
+  const ids = [];
+  for (const f of files) ids.push(await stageImage(f.blob ?? f, f.name ?? fileName(f)));
+  return ids;
 }
 
 // Ids of the backlog list in the order shown (R5.1); reordering only acts on these.
@@ -162,7 +181,7 @@ async function move(id, delta) {
   const to = at + delta;
   if (at < 0 || to < 0 || to >= ids.length) return;
   ids.splice(to, 0, ids.splice(at, 1)[0]);
-  await store.reorder(ids);
+  await send('reorder', { ids });
   await itemsChanged();
   document.querySelector(`li.row[data-id="${id}"]`)?.focus();
 }
@@ -247,7 +266,7 @@ function wireDrag(li, id) {
     clearDropMarks();
     const ids = queueIds().filter((x) => x !== dragId);
     ids.splice(ids.indexOf(id) + (after ? 1 : 0), 0, dragId);
-    await store.reorder(ids);
+    await send('reorder', { ids });
     await itemsChanged();
   });
 }
@@ -256,7 +275,7 @@ function clearDropMarks() {
 }
 
 async function remove(item) {
-  await store.removeItem(item.id);
+  await send('remove', { id: item.id });
   await itemsChanged();
 }
 
@@ -265,7 +284,7 @@ async function retry(item) {
   // current round count as the new baseline for the submitted-elsewhere check.
   const a = state.term ? findAssignment(state.term, item.assignmentId) : null;
   const roundsAtQueue = a ? nodeSubmissions(a, item.nodeId).length : null;
-  await store.patchItem(item.id, { status: 'queued', reason: null, reasonDetail: null, attempts: 0, nextAttemptAt: null, roundsAtQueue }, ['blocked', 'failed']);
+  await send('retry', { id: item.id, roundsAtQueue });
   await itemsChanged();
 }
 
@@ -302,7 +321,7 @@ function renderBacklog() {
     removeTitle: t('remove'),
   })));
 
-  // 完整作业 not submitted yet: a reminder only, the extension never submits it (R3).
+  // 完整作业 not submitted yet: a reminder only, Chamber never submits it (R3).
   const due = state.term ? finalSubmissionsDue(state.term) : [];
   $('finalDue').hidden = !due.length;
   $('finalList').replaceChildren(...due.map((a) => el('li', { class: 'row' },
@@ -317,7 +336,7 @@ function siteLink(href, text) {
 }
 
 // In review (R5.2): every pending round on the platform, with our own item's images and
-// follow-ups when the extension sent it. Our pending items the last check has not
+// follow-ups when Chamber sent it. Our pending items the last check has not
 // reported yet are listed as well.
 function renderReview() {
   const pend = state.snap?.pending || [];
@@ -373,7 +392,7 @@ const FINISHED = new Set(['done', 'continued', 'skipped', 'withdrawn']);
 // ---------------------------------------------------------------------------
 // Withdraw (requirements R6). Replacement images are picked and checked first, so
 // cancelling the file dialog never withdraws anything; then the user confirms the exact
-// round in a dialog; the service worker re-checks it before deleting.
+// round in a dialog; the app re-checks it before deleting.
 
 let withdrawing = null; // { round, files }
 let withdrawPreviewUrls = []; // thumbnails shown in the dialog
@@ -413,12 +432,12 @@ async function confirmWithdraw() {
     const a = state.term ? findAssignment(state.term, round.assignmentId) : null;
     const n = a && round.nodeId ? findNode(a, round.nodeId) : null;
     replacement = {
-      imageIds: await store.stageImages(files.map((f) => ({ blob: f, name: fileName(f) }))),
+      imageIds: await stageFiles(files),
       title: a ? label(a, n) : round.label,
     };
   }
-  // The service worker discards staged images itself if it refuses.
-  const res = await send('chamber:withdraw', {
+  // The app discards staged images itself if it refuses.
+  const res = await send('withdraw', {
     assignmentId: round.assignmentId, nodeId: round.nodeId, submissionId: round.submissionId, replacement,
   });
   if (res?.ok) {
@@ -657,13 +676,21 @@ async function addItem() {
 
   const title = label(a, n);
   $('addBtn').disabled = true;
-  // enqueue() replaces an item for this node that got stuck; otherwise the new item
-  // goes after any earlier ones on the node as a follow-up.
-  await store.enqueue({
-    images: state.images.map(({ blob, name }) => ({ blob, name })), assignmentId: sel.assignmentId, nodeId: sel.nodeId, title,
-    roundsAtQueue: nodeSubmissions(a, sel.nodeId).length,
-  });
-  await chrome.storage.local.set({ 'chamber:lastPick': { assignmentId: sel.assignmentId, nodeId: sel.nodeId, label: title } });
+  // The app replaces an item for this node that got stuck; otherwise the new item goes
+  // after any earlier ones on the node as a follow-up.
+  let res;
+  try {
+    res = await send('enqueue', {
+      imageIds: await stageFiles(state.images), assignmentId: sel.assignmentId, nodeId: sel.nodeId, title,
+      roundsAtQueue: nodeSubmissions(a, sel.nodeId).length,
+    });
+  } catch (e) {
+    res = { error: e?.message || String(e) };
+  }
+  if (!res?.ok) {
+    updateAddButton();
+    return showAddError(reasonText(res?.error || 'enqueueFailed'));
+  }
   clearImages();
   state.selected = null;
   await itemsChanged();
@@ -674,7 +701,7 @@ async function addItem() {
 // Audit
 
 async function renderAudit() {
-  const log = (await getAudit()).slice(-60).reverse();
+  const log = (await send('audit')).slice(-60).reverse();
   const titles = new Map(state.backlog.map((i) => [i.id, i.title]));
   $('auditList').replaceChildren(...log.map((e) => el('li', {},
     el('span', { text: new Date(e.at).toLocaleString() }),
@@ -684,7 +711,12 @@ async function renderAudit() {
 // ---------------------------------------------------------------------------
 
 async function refresh({ tree = false } = {}) {
-  await Promise.all([loadLocal(), loadTree(tree), loadLogin()]);
+  try {
+    await Promise.all([loadLocal(), loadTree(tree), loadLogin()]);
+  } catch {
+    renderBanner(); // the app is not reachable
+    return;
+  }
   // Show the backlog in the order the scheduler will actually use.
   if (state.term) state.backlog = prioritize(target, state.term, state.backlog).map((r) => r.item);
   renderHeader();
@@ -738,7 +770,7 @@ function renderLogin(st) {
   $('loginForget').hidden = !st.account && !st.hasPassword;
   let text = t('autoLoginOff');
   let error = false;
-  if (st.enabled && !st.hasPassword) text = t('autoLoginNeedCreds');
+  if (st.saveRefused) { text = t(st.saveRefused); error = true; } else if (st.enabled && !st.hasPassword) text = t('autoLoginNeedCreds');
   else if (st.enabled && st.error) { text = t(st.rejected ? 'autoLoginRejected' : 'autoLoginFailed', [st.error]); error = true; }
   else if (st.enabled && st.ok) text = t('autoLoginOk', [new Date(st.at).toLocaleString()]);
   else if (st.enabled) text = t('autoLoginReady');
@@ -748,7 +780,7 @@ function renderLogin(st) {
 }
 
 async function loadLogin() {
-  renderLogin(await send('chamber:loginStatus'));
+  renderLogin(await send('loginStatus'));
 }
 
 function wire() {
@@ -760,7 +792,7 @@ function wire() {
     $('loginSave').disabled = true;
     $('loginStatus').textContent = t('autoLoginSaving');
     try {
-      renderLogin(await send('chamber:saveLogin', {
+      renderLogin(await send('saveLogin', {
         enabled: $('loginEnabled').checked, account: $('loginAccount').value, password: $('loginPassword').value,
       }));
     } finally {
@@ -774,16 +806,16 @@ function wire() {
     $('loginPassword').value = '';
     $('loginAccount').value = '';
     loginDirty = false;
-    renderLogin(await send('chamber:forgetLogin'));
+    renderLogin(await send('forgetLogin'));
   });
 
   for (const opt of $('tickSeconds').options) opt.textContent = t('seconds', [opt.value]);
 
-  $('pauseBtn').addEventListener('click', () => send('chamber:settings', { patch: { paused: !state.settings.paused } }));
-  $('autoSubmit').addEventListener('change', (e) => send('chamber:settings', { patch: { autoSubmit: e.target.checked } }));
-  $('dryRun').addEventListener('change', (e) => send('chamber:settings', { patch: { dryRun: e.target.checked } }));
-  $('tickSeconds').addEventListener('change', (e) => send('chamber:settings', { patch: { tickSeconds: Number(e.target.value) } }));
-  $('reviewHoursOn').addEventListener('change', (e) => send('chamber:settings', { patch: { reviewHoursOn: e.target.checked } }));
+  $('pauseBtn').addEventListener('click', () => send('settings', { patch: { paused: !state.settings.paused } }));
+  $('autoSubmit').addEventListener('change', (e) => send('settings', { patch: { autoSubmit: e.target.checked } }));
+  $('dryRun').addEventListener('change', (e) => send('settings', { patch: { dryRun: e.target.checked } }));
+  $('tickSeconds').addEventListener('change', (e) => send('settings', { patch: { tickSeconds: Number(e.target.value) } }));
+  $('reviewHoursOn').addEventListener('change', (e) => send('settings', { patch: { reviewHoursOn: e.target.checked } }));
   $('reviewHours').addEventListener('change', (e) => {
     const text = e.target.value.trim();
     if (!parseReviewHours(text)) {
@@ -791,23 +823,23 @@ function wire() {
       return;
     }
     $('reviewHoursError').textContent = '';
-    send('chamber:settings', { patch: { reviewHours: text } });
+    send('settings', { patch: { reviewHours: text } });
   });
   $('locale').addEventListener('change', async (e) => {
-    await send('chamber:settings', { patch: { locale: e.target.value } });
+    await send('settings', { patch: { locale: e.target.value } });
     location.reload();
   });
   $('runOnce').addEventListener('click', async () => {
     $('runOnce').disabled = true;
-    try { await send('chamber:tick', { manual: true }); } finally { await refresh({ tree: true }); }
+    try { await send('tick', { manual: true }); } finally { await refresh({ tree: true }); }
   });
   $('bannerAction').addEventListener('click', openSite);
   $('finalOpen').addEventListener('click', () => {
-    chrome.tabs.create({ url: siteLearningUrl(target, state.term?.termId) });
+    window.open(siteLearningUrl(target, state.term?.termId), '_blank', 'noopener');
   });
   $('clearDone').addEventListener('click', async (e) => {
     e.preventDefault(); // it sits in the section's <summary>; do not toggle it
-    for (const i of state.backlog.filter((x) => FINISHED.has(x.status))) await store.removeItem(i.id);
+    await send('clearFinished');
     await itemsChanged();
   });
 
@@ -831,7 +863,10 @@ function wire() {
     const cur = state.backlog.find((i) => i.id === state.replaceId);
     const a = cur && state.term ? findAssignment(state.term, cur.assignmentId) : null;
     if (cur) {
-      await store.replaceImages(cur.id, files.map((f) => ({ blob: f, name: fileName(f) })), a ? nodeSubmissions(a, cur.nodeId).length : null);
+      const res = await send('replaceImages', {
+        id: cur.id, imageIds: await stageFiles(files), roundsAtQueue: a ? nodeSubmissions(a, cur.nodeId).length : null,
+      });
+      if (!res?.ok) showAddError(reasonText(res?.error));
     }
     state.replaceId = null;
     await itemsChanged();
@@ -851,6 +886,19 @@ function wire() {
   $('resetFilter').addEventListener('click', () => changeFilter((f) => Object.assign(f, defaultFilter())));
   $('addBtn').addEventListener('click', addItem);
   $('auditList').closest('details').addEventListener('toggle', (e) => { if (e.target.open) renderAudit(); });
+  // Quit asks for a second click instead of a dialog (R9.6).
+  let quitArmed = null;
+  $('quitApp').addEventListener('click', async () => {
+    if (!quitArmed) {
+      $('quitApp').textContent = t('quitAppConfirm');
+      quitArmed = setTimeout(() => { quitArmed = null; $('quitApp').textContent = t('quitApp'); }, 4000);
+      return;
+    }
+    clearTimeout(quitArmed);
+    $('quitApp').disabled = true;
+    await send('quit').catch(() => {});
+  });
+  connection.onChange = (down) => { renderBanner(); if (!down) refresh({ tree: true }); };
   window.addEventListener('focus', () => refresh({ tree: true }));
   onChanged(() => refresh());
 }

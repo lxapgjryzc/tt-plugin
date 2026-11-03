@@ -1,5 +1,6 @@
-// Content script on tenten.art. Three jobs:
-// 1. Hand the SPA's bearer token to the service worker (so ticks work after the tab closes).
+// Content script on tenten.art. Three jobs, all relayed by the service worker to the
+// Chamber app on this computer (requirements R9.16):
+// 1. Hand the SPA's bearer token to the app (so checks work after the tab closes).
 // 2. On an assignment page, show one floating pill that links into the queue.
 // 3. Add an "add to queue" button next to the site's own submit controls, queuing what
 //    the user put in the site's upload box instead of submitting now:
@@ -158,17 +159,17 @@
 
     const [info, store] = await Promise.all([
       send({ type: 'chamber:lookup', assignmentId }),
-      chrome.storage.local.get(['chamber:lastPick', 'chamber:snapshot']),
+      send({ type: 'chamber:badgeInfo' }),
     ]);
     if (shown !== assignmentId) return;
     aVal.textContent = info?.title || t('badgeUnknown');
-    const pick = store['chamber:lastPick'];
+    const pick = store?.lastPick;
     let nodeId = null;
     if (pick && pick.assignmentId === assignmentId) {
       nodeId = pick.nodeId;
       nVal.textContent = pick.label;
     }
-    const snap = store['chamber:snapshot'];
+    const snap = store?.snapshot;
     if (snap?.limit != null) {
       for (let i = 0; i < snap.limit; i++) pips.append(el('span', { class: `pip${i < snap.pending.length ? ' on' : ''}` }));
       pips.setAttribute('title', t('slotsFree', [String(Math.max(0, snap.limit - snap.pending.length)), String(snap.limit)]));

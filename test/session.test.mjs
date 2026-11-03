@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tokenExpiry, sessionState, fresherToken, EXPIRING_SOON_MS } from '../extension/src/session.js';
+import { tokenExpiry, sessionState, fresherToken, EXPIRING_SOON_MS } from '../app/src/session.js';
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const jwt = (payload) => `${b64url({ alg: 'HS512' })}.${b64url(payload)}.sig`;

@@ -1,4 +1,4 @@
-// Thumbnails for extension pages (requirements R8). Pages never display an original
+// Thumbnails for the queue page (requirements R8). Pages never display an original
 // image: a drawing can be ~100 megapixels, and showing it even at 40 px makes the browser
 // decode and resample it on every repaint.
 

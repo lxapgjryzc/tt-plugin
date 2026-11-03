@@ -1,5 +1,5 @@
 import { target } from './target.mock.js';
-import { ApiError } from '../extension/src/adapter.js';
+import { ApiError } from '../app/src/adapter.js';
 
 export { target };
 

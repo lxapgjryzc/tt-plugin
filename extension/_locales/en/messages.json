@@ -3,7 +3,7 @@
     "message": "Chamber"
   },
   "extDescription": {
-    "message": "Queues finished drawings for tenten.art and submits them as review slots free up."
+    "message": "Adds Chamber queue buttons to tenten.art and connects them to the Chamber app on this computer."
   },
   "queuePageTitle": {
     "message": "Chamber queue"
@@ -47,10 +47,10 @@
     }
   },
   "noTab": {
-    "message": "Open tenten.art and log in."
+    "message": "Not logged in. Turn on Automatic login below, or log in on tenten.art in Chrome with the Chamber extension installed."
   },
   "sessionInvalid": {
-    "message": "Session expired. Open tenten.art and log in again."
+    "message": "Session expired. Turn on Automatic login below, or log in again on tenten.art in Chrome with the Chamber extension."
   },
   "openSite": {
     "message": "Open tenten.art"
@@ -116,7 +116,7 @@
     "message": "Only check during review hours"
   },
   "reviewHoursHint": {
-    "message": "Beijing time, when TAs review. Outside these hours the regular check pauses (it keeps going for 30 minutes after each window). Adding an image, clicking the toolbar icon or Run one check now still checks right away."
+    "message": "Beijing time, when TAs review. Outside these hours the regular check pauses (it keeps going for 30 minutes after each window, and checks once right after the computer wakes up). Adding an image, opening this page or Run one check now still checks right away."
   },
   "reviewHoursLocal": {
     "message": "Your time: $P1$",
@@ -146,6 +146,27 @@
   },
   "runOnce": {
     "message": "Run one check now"
+  },
+  "quitApp": {
+    "message": "Quit Chamber"
+  },
+  "quitAppConfirm": {
+    "message": "Click again to quit"
+  },
+  "quitAppHint": {
+    "message": "Stops checking and submitting until you start Chamber again or log on to Windows next time."
+  },
+  "appStopped": {
+    "message": "The Chamber app is not running. Start it again (npm start, or log on to Windows with autostart on); this page reconnects by itself."
+  },
+  "passwordNoEncryption": {
+    "message": "The password could not be encrypted on this computer, so it was not saved."
+  },
+  "appUnreachable": {
+    "message": "The Chamber app is not running on this computer; nothing was queued."
+  },
+  "appNotPaired": {
+    "message": "Open the Chamber queue page once in this browser to connect the extension; nothing was queued."
   },
   "hintPaused": {
     "message": "Paused. Nothing will be uploaded or submitted."
@@ -532,7 +553,7 @@
     "message": "Could not tell which node this is; add it on the queue page"
   },
   "reasonOtherTerm": {
-    "message": "This term is not the one the extension follows"
+    "message": "This term is not the one Chamber follows"
   },
   "reasonNodeChanged": {
     "message": "The node changed on the platform; check it there"
@@ -701,13 +722,13 @@
     "message": "Logged out of tenten.art"
   },
   "notifyLoggedOutBody": {
-    "message": "Submissions are paused and your queue is waiting. Click to log in again."
+    "message": "Submissions are paused and your queue is waiting. Click to open the queue page."
   },
   "notifyExpiringTitle": {
     "message": "tenten.art login expires soon"
   },
   "notifyExpiringBody": {
-    "message": "It expires at $P1$. Log in again on the site to keep submissions going.",
+    "message": "It expires at $P1$. Turn on Automatic login, or log in again on the site, to keep submissions going.",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -772,7 +793,7 @@
     }
   },
   "autoLoginHint": {
-    "message": "When on, the extension logs in to tenten.art with this password whenever the 24-hour session runs out, and restores the site's own login too. The password is stored unencrypted in this Chrome profile, readable only by this extension, and is sent only to tenten.art. Leave the password empty to keep the saved one."
+    "message": "When on, Chamber logs in to tenten.art with this password whenever the 24-hour session runs out, and the extension restores the site's own login with it. The password is encrypted for your Windows account (DPAPI) and stored on this computer only, and is sent only to tenten.art. Leave the password empty to keep the saved one."
   },
   "notifyAutoLoginFailedTitle": {
     "message": "Automatic login failed"
@@ -798,7 +819,7 @@
     "message": "完整作业 not submitted"
   },
   "finalDueHint": {
-    "message": "Every node is approved. Submit the 完整作业 on the site; the extension does not queue it."
+    "message": "Every node is approved. Submit the 完整作业 on the site; Chamber does not queue it."
   },
   "openOnSite": {
     "message": "Open on site"

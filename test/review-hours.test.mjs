@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseReviewHours, inReviewHours, beijingMinutes, nextWindowStart, DEFAULT_REVIEW_HOURS,
-} from '../extension/src/review-hours.js';
+} from '../app/src/review-hours.js';
 
 // A Beijing wall-clock time on 2026-10-28 as epoch ms.
 const bj = (hhmm) => Date.parse(`2026-10-28T${hhmm}:00+08:00`);

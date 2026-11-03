@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseServerTime, assignmentExpired } from '../extension/src/model.js';
+import { parseServerTime, assignmentExpired } from '../app/src/model.js';
 
 test('server times are read as Beijing time', () => {
   assert.equal(new Date(parseServerTime('2026-10-27T12:45:44')).toISOString(), '2026-10-27T04:45:44.000Z');

@@ -3,8 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeTerm, ids, item, fakeServer, fakeDeps, setStatus, addRound } from './fixtures.mjs';
-import { runTick } from '../extension/src/engine.js';
-import { needsAttention } from '../extension/src/scheduler.js';
+import { runTick } from '../app/src/engine.js';
+import { needsAttention } from '../app/src/scheduler.js';
 
 const onNode = (over = {}) => item({ roundsAtQueue: 0, ...over });
 const writes = (api) => api.calls.post + api.calls.put;

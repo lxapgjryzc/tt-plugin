@@ -1,203 +1,49 @@
-// Service worker: alarm loop, message hub, token sync. Holds no scheduling state in
-// memory; every tick re-reads IndexedDB and the API.
+// Service worker of the thin extension (requirements R9.16-R9.20). It holds no queue and
+// never calls the platform: it relays the site page's requests to the Chamber app on this
+// computer, shows the app's state on the toolbar icon, and opens the queue page.
 
-import { target } from './target.js';
-import { makeApi } from './adapter.js';
-import { runTick } from './engine.js';
-import { withdrawRound } from './withdraw.js';
-import { selectTerm, listAssignments, countPending, findAssignment, findNode, nodeSubmissions, label, resolveDialogNode } from './model.js';
-import { canQueue, needsAttention } from './scheduler.js';
-import { imageSetProblem } from './images.js';
-import { loadMessages, format, PAGE_LOCALE } from './i18n.js';
-import { getToken, storeToken, usable } from './token-bridge.js';
-import { sessionState, tokenExpiry, fresherToken } from './session.js';
-import { tryAutoLogin, autoLoginActive, loginStatus, saveLogin, forgetLogin } from './auto-login.js';
-import { parseReviewHours, inReviewHours } from './review-hours.js';
-import * as store from './storage/idb.js';
-import {
-  KEYS, getSettings, setSettings, appendAudit, getAudit, acquireLock, refreshLock, releaseLock,
-} from './storage/settings.js';
+const APP = 'http://127.0.0.1:47815';
+const KEY = 'chamber:appKey';
+const ALARM = 'chamber:badge';
+const PAGE_LOCALE = 'zh_CN'; // tenten.art is Chinese-only
 
-const ALARM = 'chamber:tick';
-const api = makeApi(target);
+class AppError extends Error {}
 
-const deps = {
-  target,
-  api,
-  store,
-  settings: { get: getSettings, set: setSettings },
-  lock: { acquire: acquireLock, refresh: refreshLock, release: releaseLock },
-  audit: async (entry) => {
-    await appendAudit(entry);
-    if (entry.action === 'reconcile') notifyTransition(entry);
-    else if (entry.result === 'preflight: reasonApproved') notifyTransition({ itemId: entry.itemId, result: 'uploading -> skipped' });
-  },
-  // With automatic login on, a missing, expired or soon-expiring token triggers a login.
-  getToken: async ({ fresh } = {}) => {
-    const token = await getToken({ fresh });
-    if (sessionState({ token }) === 'ok') return token;
-    return (await tryAutoLogin(api)) || token;
-  },
-  dropToken: () => storeToken(null),
-  saveSnapshot: (snap) => chrome.storage.local.set({ [KEYS.snapshot]: snap }),
-  now: () => Date.now(),
-};
-
-// ---- Origin header ------------------------------------------------------
-// The platform's CORS filter answers `403 Invalid CORS request` to any request whose
-// Origin is chrome-extension://…. Chrome omits Origin on the worker's GETs but sends
-// it on POST/PUT, so uploads and submissions would fail. Strip it from requests the
-// worker makes (they have no tab) to the API; page requests are untouched.
-const ORIGIN_RULE_ID = 1;
-const originRuleReady = chrome.declarativeNetRequest.updateSessionRules({
-  removeRuleIds: [ORIGIN_RULE_ID],
-  addRules: [{
-    id: ORIGIN_RULE_ID,
-    priority: 1,
-    action: { type: 'modifyHeaders', requestHeaders: [{ header: 'origin', operation: 'remove' }] },
-    condition: {
-      urlFilter: `|${target.base}/api/`,
-      tabIds: [chrome.tabs.TAB_ID_NONE],
-      resourceTypes: ['xmlhttprequest', 'other'],
-    },
-  }],
-});
-
-// ---- tick ---------------------------------------------------------------
-
-let running = null;
-let again = false;
-
-async function tick({ manual = false } = {}) {
-  if (running) {
-    if (!manual) {
-      again = true;
-      return running;
-    }
-    // A manual check must not be swallowed by an automatic one already in flight
-    // (e.g. the one triggered by Retry): wait for it, then run our own.
-    await running.catch(() => {});
-    return tick({ manual: true });
+async function call(area, name, payload = {}) {
+  const { [KEY]: key } = await chrome.storage.local.get(KEY);
+  if (!key) throw new AppError('appNotPaired');
+  let res;
+  try {
+    res = await fetch(`${APP}/api/${area}/${name}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Chamber-Key': key },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new AppError('appUnreachable');
   }
-  running = (async () => {
-    try {
-      await originRuleReady;
-      const r = await runTick(deps, { manual });
-      await chrome.storage.local.set({ [KEYS.lastTick]: { at: new Date().toISOString(), ...r } });
-      return r;
-    } finally {
-      running = null;
-      await refreshBadge();
-      await checkSession();
-      broadcast();
-    }
-  })();
-  const r = await running;
-  if (again) {
-    again = false;
-    queueMicrotask(() => tick());
-  }
-  return r;
+  if (res.status === 403) throw new AppError('appNotPaired'); // the app's key changed
+  if (!res.ok) throw new AppError('appUnreachable');
+  return res.json();
 }
 
-let soonTimer = null;
-function tickSoon(ms = 1500) {
-  clearTimeout(soonTimer);
-  soonTimer = setTimeout(() => tick(), ms);
-}
-
-async function ensureAlarm() {
-  const s = await getSettings();
-  const period = Math.max(30, s.tickSeconds) / 60;
-  const cur = await chrome.alarms.get(ALARM);
-  if (!cur || Math.abs(cur.periodInMinutes - period) > 1e-6) {
-    await chrome.alarms.create(ALARM, { periodInMinutes: period, delayInMinutes: period });
-  }
-}
-
-function broadcast() {
-  chrome.runtime.sendMessage({ type: 'chamber:changed' }).catch(() => {});
-}
-
-// ---- action badge & notifications --------------------------------------
-
+// ---- toolbar badge (R9.19) ------------------------------------------------
 async function refreshBadge() {
-  const [s, backlog, { [KEYS.snapshot]: snap, [KEYS.token]: token }] = await Promise.all([
-    getSettings(), store.listBacklog(), chrome.storage.local.get([KEYS.snapshot, KEYS.token]),
-  ]);
-  const revision = needsAttention(backlog).length;
-  const loggedOut = ['expired', 'invalid', 'missing'].includes(sessionState({ token, sessionInvalid: s.sessionInvalid }));
-  let text = '';
-  if (loggedOut) text = '!';
-  else if (s.paused) text = '||';
-  else if (revision) text = String(revision);
-  else if (snap?.limit != null) text = `${snap.pending.length}/${snap.limit}`;
+  let text = 'off';
+  let color = '#8a8a86';
+  try {
+    const b = await call('site', 'badge');
+    text = b.text;
+    color = b.alert ? '#c2410c' : '#1c1c1c';
+  } catch { /* not running or not paired */ }
   await chrome.action.setBadgeText({ text });
-  await chrome.action.setBadgeBackgroundColor({ color: loggedOut || revision || s.paused ? '#c2410c' : '#1c1c1c' });
+  await chrome.action.setBadgeBackgroundColor({ color });
 }
-
-// ---- login reminders ----------------------------------------------------
-// The site's token lives exactly 24 h and cannot be refreshed, so warn an hour
-// before it expires and again (persistently) once it has. Each notice is shown once.
-const LOGIN_NOTE = 'chamber-login';
-
-async function checkSession() {
-  const s = await getSettings();
-  const { [KEYS.token]: token, [KEYS.sessionNotice]: shown } = await chrome.storage.local.get([KEYS.token, KEYS.sessionNotice]);
-  const state = sessionState({ token, sessionInvalid: s.sessionInvalid });
-  const exp = tokenExpiry(token);
-  let notice = state === 'expiring' ? `expiring:${exp}` : state === 'ok' ? null : 'loggedOut';
-  // Automatic login handles it; only speak up if it is off or failing.
-  if (notice && await autoLoginActive()) notice = null;
-  const failed = notice === 'loggedOut' && s.autoLogin ? (await loginStatus()).error : null;
-  if (notice === (shown ?? null)) return;
-  if (!notice) {
-    await chrome.storage.local.remove(KEYS.sessionNotice);
-    chrome.notifications.clear(LOGIN_NOTE);
-    return;
-  }
-  await chrome.storage.local.set({ [KEYS.sessionNotice]: notice });
-  const messages = await loadMessages(s.locale);
-  const time = exp ? new Date(exp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  chrome.notifications.create(LOGIN_NOTE, {
-    type: 'basic',
-    iconUrl: chrome.runtime.getURL('icons/128.png'),
-    title: format(messages, failed ? 'notifyAutoLoginFailedTitle' : notice === 'loggedOut' ? 'notifyLoggedOutTitle' : 'notifyExpiringTitle'),
-    message: failed
-      ? format(messages, 'notifyAutoLoginFailedBody', [failed])
-      : format(messages, notice === 'loggedOut' ? 'notifyLoggedOutBody' : 'notifyExpiringBody', [time]),
-    requireInteraction: notice === 'loggedOut',
-  });
-}
-
-const NOTIFY_TITLES = { done: 'notifyApproved', needs_revision: 'notifyRevision', skipped: 'notifySkipped' };
-
-async function notifyTransition(entry) {
-  const to = entry.result.split(' -> ')[1];
-  if (!NOTIFY_TITLES[to]) return;
-  const item = await store.getItem(entry.itemId);
-  const messages = await loadMessages((await getSettings()).locale);
-  chrome.notifications.create(`chamber-${entry.itemId}-${to}`, {
-    type: 'basic',
-    iconUrl: chrome.runtime.getURL('icons/128.png'),
-    title: format(messages, NOTIFY_TITLES[to]),
-    message: item?.title || '',
-  });
-}
-
-chrome.notifications.onClicked.addListener(async (id) => {
-  chrome.notifications.clear(id);
-  // A failed automatic login is fixed on the settings page; otherwise log in on the site.
-  if (id === LOGIN_NOTE && !(await getSettings()).autoLogin) chrome.tabs.create({ url: `${target.base}/` });
-  else openQueue();
-});
-
-// The toolbar icon opens the queue page (no popup) and checks right away.
-chrome.action.onClicked.addListener(() => { openQueue(); tickSoon(300); });
 
 async function openQueue(query = '') {
-  const url = chrome.runtime.getURL(`ui/options.html${query}`);
-  const [tab] = await chrome.tabs.query({ url: chrome.runtime.getURL('ui/options.html*') });
+  const url = `${APP}/${query}`;
+  const tabs = await chrome.tabs.query({ url: [`${APP}/*`, 'http://localhost:47815/*'] });
+  const [tab] = tabs;
   if (tab) {
     await chrome.tabs.update(tab.id, { active: true, ...(query ? { url } : {}) });
     await chrome.windows.update(tab.windowId, { focused: true });
@@ -206,220 +52,70 @@ async function openQueue(query = '') {
   }
 }
 
-// ---- read-only probe ----------------------------------------------------
+chrome.action.onClicked.addListener(() => {
+  openQueue();
+  call('site', 'pageNav').catch(() => {}); // check right away
+});
 
-async function loadTree() {
-  await originRuleReady;
-  const token = await getToken();
-  if (!token) return { error: 'NO_TAB' };
-  api.setToken(token);
-  try {
-    const courses = await api.courses();
-    const s = await getSettings();
-    const termId = s.activeTermId || selectTerm(courses)?.termId;
-    if (!termId) return { courses, term: null };
-    const term = await api.weeks(String(termId));
-    return { courses, term };
-  } catch (e) {
-    if (e?.status === 401) {
-      await setSettings({ sessionInvalid: true });
-      return { error: 'SESSION_INVALID' };
-    }
-    return { error: e?.message || String(e) };
-  }
+// ---- messages from content scripts -------------------------------------------
+const fromSite = (sender) => sender.id === chrome.runtime.id && sender.url?.startsWith('https://tenten.art/');
+const fromApp = (sender) => sender.id === chrome.runtime.id
+  && (sender.url?.startsWith(`${APP}/`) || sender.url?.startsWith('http://localhost:47815/'));
+
+let strings = null;
+async function pageStrings() {
+  if (!strings) strings = await (await fetch(chrome.runtime.getURL(`_locales/${PAGE_LOCALE}/messages.json`))).json();
+  return strings;
 }
-
-async function probe() {
-  const { term, error } = await loadTree();
-  if (error) return { error };
-  return {
-    termId: term.termId,
-    termName: term.termName,
-    maxPendingSubmissions: term.maxPendingSubmissions,
-    pending: countPending(target, term),
-    assignments: listAssignments(term).map(({ assignment: a }) => ({
-      assignmentId: a.assignmentId,
-      title: a.title,
-      status: a.status,
-      blocked: !!a.blockedReason,
-      nodes: (a.nodes || []).map((n) => ({ nodeId: n.nodeId, order: n.nodeOrder, status: n.status, locked: n.locked })),
-    })),
-  };
-}
-
-self.chamber = { probe, tick, getAudit, getSettings, setSettings, listBacklog: store.listBacklog };
-
-// ---- messages -----------------------------------------------------------
 
 const handlers = {
-  'chamber:token': async ({ token }, sender) => {
-    if (!sender.url?.startsWith(target.base)) return { ok: false };
-    const prev = (await chrome.storage.local.get(KEYS.token))[KEYS.token];
-    if (token === prev) return { ok: true };
-    if (usable(token)) {
-      // Adopt the page's token unless ours is still good and lasts longer (e.g. the page
-      // holds yesterday's token while automatic login already got a new one).
-      if (fresherToken(prev, token) === prev) return { ok: true };
-      await storeToken(token);
-      tickSoon(); // a fresh login: resume (the tick clears sessionInvalid)
-    } else if (!token && !(await getSettings()).autoLogin) {
-      // Logged out on the site: forget our copy too. (An expired token on the page
-      // is just ignored; with automatic login on, we keep our own session.)
-      await storeToken(null);
-    } else {
-      return { ok: true };
-    }
+  'chamber:pair': async ({ key }, sender) => {
+    if (!fromApp(sender) || typeof key !== 'string' || !key) return { ok: false };
+    await chrome.storage.local.set({ [KEY]: key });
     await refreshBadge();
-    await checkSession();
     return { ok: true };
   },
-  // The site page asks for the session obtained by automatic login, to restore its
-  // own login when it has expired. Only answered while automatic login is on.
-  'chamber:siteSession': async (_msg, sender) => {
-    if (!sender.url?.startsWith(target.base)) return null;
-    if (!(await getSettings()).autoLogin) return null;
-    const { [KEYS.siteSession]: session } = await chrome.storage.local.get(KEYS.siteSession);
-    return session && usable(session.token) ? session : null;
-  },
-  // Settings page only (never content scripts): status without the password, save, forget.
-  'chamber:loginStatus': async (_msg, sender) => (fromExtensionPage(sender) ? loginStatus() : null),
-  'chamber:saveLogin': async ({ enabled, account, password }, sender) => {
-    if (!fromExtensionPage(sender)) return null;
-    await saveLogin({ enabled, account, password });
-    if (enabled) {
-      const token = await tryAutoLogin(api, { force: true });
-      if (token) tickSoon(300);
-    }
-    await refreshBadge();
-    await checkSession();
-    broadcast();
-    return loginStatus();
-  },
-  'chamber:forgetLogin': async (_msg, sender) => {
-    if (!fromExtensionPage(sender)) return null;
-    await forgetLogin();
-    await refreshBadge();
-    await checkSession();
-    broadcast();
-    return loginStatus();
-  },
-  // Queue page only, after the user confirmed this exact round (requirements R6).
-  // Replacement images were stored by the page beforehand; they are discarded on refusal.
-  'chamber:withdraw': async ({ assignmentId, nodeId, submissionId, replacement }, sender) => {
-    if (!fromExtensionPage(sender)) return null;
-    await originRuleReady;
-    const res = await withdrawRound(deps, { assignmentId, nodeId, submissionId, replacement: replacement || null });
-    if (!res.ok && replacement?.imageIds?.length) await store.discardImages(replacement.imageIds);
-    await refreshBadge();
-    broadcast();
-    if (res.ok) tickSoon(300); // use the freed slot
+  'chamber:pageStrings': () => pageStrings(),
+  'chamber:token': async ({ token }, sender) => (fromSite(sender) ? call('site', 'token', { token: token || null }) : null),
+  'chamber:siteSession': async (_m, sender) => (fromSite(sender) ? call('site', 'session') : null),
+  'chamber:lookup': async ({ assignmentId }) => call('site', 'lookup', { assignmentId }),
+  'chamber:badgeInfo': async () => call('site', 'badge'),
+  'chamber:pageNav': async () => call('site', 'pageNav'),
+  'chamber:openQueue': async ({ query }) => { await openQueue(query || ''); return { ok: true }; },
+  'chamber:enqueue': async ({ where, images }, sender) => {
+    if (!fromSite(sender)) return { error: 'reasonAssignmentMissing' };
+    const res = await call('site', 'enqueue', { where, images });
+    refreshBadge();
     return res;
   },
-  'chamber:pageNav': async () => { tickSoon(); return { ok: true }; },
-  // tenten.art is Chinese-only, so everything injected into it uses PAGE_LOCALE.
-  'chamber:pageStrings': async () => (await loadMessages(PAGE_LOCALE)) || {},
-  'chamber:tick': async ({ manual }) => tick({ manual: !!manual }),
-  'chamber:tree': () => loadTree(),
-  'chamber:settings': async ({ patch }) => {
-    const next = await setSettings(patch || {});
-    await ensureAlarm();
-    await refreshBadge();
-    broadcast();
-    if (patch && ('paused' in patch || 'autoSubmit' in patch) && !next.paused) tickSoon(300);
-    return next;
-  },
-  'chamber:itemsChanged': async () => { await refreshBadge(); broadcast(); tickSoon(); return { ok: true }; },
-  'chamber:openQueue': async ({ query }) => { await openQueue(query || ''); return { ok: true }; },
-  // From the site: queue the image(s) the user put in one of the site's upload boxes.
-  // `where` is { assignmentId, nodeOrder, nodeTitle } on the assignment page, or
-  // { termId, dialog: { chapterTitle, typeLabel, nodeTitle } } from the learning page's
-  // submit dialog. Same checks as the queue page.
-  'chamber:enqueue': async ({ where, images }, sender) => {
-    if (!sender.url?.startsWith(target.base)) return { error: 'reasonAssignmentMissing' };
-    const { term, error } = await loadTree();
-    if (error) return { error };
-    const found = await locateNode(term, where || {});
-    if (found.error) return found;
-    const { assignment: a, node } = found;
-    const parts = [];
-    for (const img of images || []) parts.push({ blob: await (await fetch(img.dataUrl)).blob(), name: img.name });
-    const bad = imageSetProblem(target, parts.map((p) => p.blob));
-    if (bad) return { error: bad };
-    const backlog = await store.listBacklog();
-    const verdict = canQueue(target, term, backlog, a, node);
-    if (!verdict.ok) return { error: verdict.reason, detail: verdict.detail ?? null };
-    const nodeId = node ? String(node.nodeId) : null;
-    const title = label(a, node);
-    const { replaced } = await store.enqueue({
-      images: parts, assignmentId: String(a.assignmentId), nodeId, title, roundsAtQueue: nodeSubmissions(a, nodeId).length,
-    });
-    await chrome.storage.local.set({ 'chamber:lastPick': { assignmentId: String(a.assignmentId), nodeId, label: title } });
-    await appendAudit({ action: 'enqueue', assignmentId: String(a.assignmentId), nodeId, result: replaced ? 'replaced' : 'added', images: parts.length, source: 'page' });
-    await refreshBadge();
-    broadcast();
-    tickSoon();
-    return { ok: true, title, replaced, chained: !!verdict.chained, followUp: !!verdict.followUp };
-  },
-  'chamber:lookup': async ({ assignmentId }) => {
-    const { term, error } = await loadTree();
-    if (error) return { error };
-    const a = listAssignments(term).find((x) => String(x.assignment.assignmentId) === String(assignmentId))?.assignment;
-    return a ? { title: a.title, nodes: (a.nodes || []).map((n) => ({ nodeId: n.nodeId, title: n.title, status: n.status, locked: n.locked })) } : { error: 'NOT_FOUND' };
-  },
 };
-
-// Find the (assignment, node) a site page refers to. Returns { assignment, node } or { error }.
-async function locateNode(term, where) {
-  let assignmentId = where.assignmentId;
-  let nodeId;
-  if (where.dialog) {
-    if (String(where.termId) !== String(term.termId)) return { error: 'reasonOtherTerm' };
-    let catalog;
-    try {
-      catalog = await api.catalog(String(term.termId));
-    } catch (e) {
-      return { error: e?.message || String(e) };
-    }
-    const hit = resolveDialogNode(catalog, where.dialog);
-    if (hit.error) return hit;
-    ({ assignmentId, nodeId } = hit);
-  }
-  const a = findAssignment(term, assignmentId);
-  if (!a) return { error: 'reasonAssignmentMissing' };
-  if (!(a.nodes || []).length) return { assignment: a, node: null };
-  const node = where.dialog
-    ? findNode(a, nodeId)
-    : a.nodes.find((n) => n.title === where.nodeTitle) || a.nodes.find((n) => n.nodeOrder === where.nodeOrder);
-  return node ? { assignment: a, node } : { error: 'reasonNodeMissing' };
-}
-
-function fromExtensionPage(sender) {
-  return sender.id === chrome.runtime.id && sender.url?.startsWith(chrome.runtime.getURL(''));
-}
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   const h = handlers[msg?.type];
   if (!h) return false;
-  Promise.resolve(h(msg, sender)).then(reply, (e) => reply({ error: e?.message || String(e) }));
+  Promise.resolve(h(msg, sender)).then(reply, (e) => reply({ error: e instanceof AppError ? e.message : (e?.message || String(e)) }));
   return true;
 });
 
-// Periodic checks pause while TAs are off duty: no review means no slot can free up.
-// Only the alarm is affected; checks triggered by the user (adding an image, clicking
-// the toolbar icon, Run one check now, visiting the site) still run, so a free slot is used.
-chrome.alarms.onAlarm.addListener(async (a) => {
-  if (a.name !== ALARM) return;
-  const s = await getSettings();
-  if (s.reviewHoursOn && !inReviewHours(parseReviewHours(s.reviewHours))) {
-    const { [KEYS.snapshot]: snap } = await chrome.storage.local.get(KEYS.snapshot);
-    if (snap && snap.why !== 'restHours') await chrome.storage.local.set({ [KEYS.snapshot]: { ...snap, why: 'restHours' } });
-    await refreshBadge();
-    await checkSession();
-    return;
-  }
-  tick();
+// ---- install / update ----------------------------------------------------------
+// Earlier versions kept the whole queue, images and the saved password in Chrome. None
+// of it is carried over (R9.20): delete it, keeping only the pairing key.
+async function dropOldData() {
+  const all = await chrome.storage.local.get(null);
+  const old = Object.keys(all).filter((k) => k !== KEY);
+  if (old.length) await chrome.storage.local.remove(old);
+  await chrome.storage.session?.clear?.();
+  await new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase('chamber');
+    req.onsuccess = req.onerror = req.onblocked = () => resolve();
+  });
+}
+
+chrome.runtime.onInstalled.addListener(async () => {
+  await dropOldData().catch(() => {});
+  await chrome.alarms.create(ALARM, { periodInMinutes: 1 });
+  refreshBadge();
 });
-chrome.runtime.onInstalled.addListener(() => { ensureAlarm(); tickSoon(500); });
-chrome.runtime.onStartup.addListener(() => { ensureAlarm(); tickSoon(500); });
-ensureAlarm();
-refreshBadge().then(checkSession).catch(() => {});
+chrome.runtime.onStartup.addListener(() => refreshBadge());
+chrome.alarms.onAlarm.addListener((a) => { if (a.name === ALARM) refreshBadge(); });
+refreshBadge().catch(() => {});

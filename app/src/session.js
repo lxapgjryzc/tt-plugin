@@ -2,7 +2,7 @@
 //
 // The token is a JWT with a fixed 24-hour lifetime and the site has no refresh
 // endpoint, so the only way to keep going is a fresh login. These helpers let the
-// extension see the expiry coming instead of discovering it from a 401.
+// app see the expiry coming instead of discovering it from a 401.
 
 export const EXPIRING_SOON_MS = 60 * 60_000;
 
@@ -57,4 +57,11 @@ export function fresherToken(a, b, now = Date.now()) {
   const lb = left(b);
   if (lb !== null && (la === null || lb > la)) return b;
   return la !== null ? a : null;
+}
+
+// A token we can still use: not past its JWT expiry (tokens without one are trusted).
+export function usable(token, now = Date.now()) {
+  if (!token) return false;
+  const exp = tokenExpiry(token);
+  return exp === null || exp > now;
 }

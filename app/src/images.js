@@ -1,4 +1,4 @@
-// Image rules shared by the queue page and the service worker (requirements R1.2).
+// Image rules shared by the queue page and the app (requirements R1.2).
 // Pure: works on anything with `type` and `size` (File, Blob).
 
 // Message key for what is wrong with one image, or null.

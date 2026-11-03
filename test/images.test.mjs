@@ -2,10 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeTerm, ids, item, fakeServer, fakeDeps, target } from './fixtures.mjs';
-import { runTick } from '../extension/src/engine.js';
-import { ApiError } from '../extension/src/adapter.js';
-import { submissionHasFile, resolveDialogNode, siteTypeLabel, finalSubmissionsDue } from '../extension/src/model.js';
-import { imageProblem, imageSetProblem } from '../extension/src/images.js';
+import { runTick } from '../app/src/engine.js';
+import { ApiError } from '../app/src/adapter.js';
+import { submissionHasFile, resolveDialogNode, siteTypeLabel, finalSubmissionsDue } from '../app/src/model.js';
+import { imageProblem, imageSetProblem } from '../app/src/images.js';
 
 const three = () => item({ imageIds: ['i1', 'i2', 'i3'] });
 

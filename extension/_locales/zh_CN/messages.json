@@ -3,7 +3,7 @@
     "message": "Chamber 作业排队"
   },
   "extDescription": {
-    "message": "为 tenten.art 排队待交作业，批改名额空出时自动提交。"
+    "message": "在 tenten.art 上添加 Chamber 排队按钮，并连接本机的 Chamber 应用。"
   },
   "queuePageTitle": {
     "message": "Chamber · 作业队列"
@@ -47,10 +47,10 @@
     }
   },
   "noTab": {
-    "message": "请打开 tenten.art 并登录。"
+    "message": "尚未登录。请在下方开启自动登录，或在装有 Chamber 扩展的 Chrome 中登录 tenten.art。"
   },
   "sessionInvalid": {
-    "message": "登录已失效，请打开 tenten.art 重新登录。"
+    "message": "登录已失效。请在下方开启自动登录，或在装有 Chamber 扩展的 Chrome 中重新登录 tenten.art。"
   },
   "openSite": {
     "message": "打开 tenten.art"
@@ -116,7 +116,7 @@
     "message": "只在批改时间检查"
   },
   "reviewHoursHint": {
-    "message": "北京时间，即助教批改的时间。其余时间暂停定时检查（每段结束后再继续 30 分钟）。添加图片、点击工具栏图标或点「立即检查一次」仍会立即检查。"
+    "message": "北京时间，即助教批改的时间。其余时间暂停定时检查（每段结束后再继续 30 分钟，电脑从睡眠中醒来时也会立即检查一次）。添加图片、打开本页或点「立即检查一次」仍会立即检查。"
   },
   "reviewHoursLocal": {
     "message": "你的本地时间：$P1$",
@@ -146,6 +146,27 @@
   },
   "runOnce": {
     "message": "立即检查一次"
+  },
+  "quitApp": {
+    "message": "退出 Chamber"
+  },
+  "quitAppConfirm": {
+    "message": "再点一次退出"
+  },
+  "quitAppHint": {
+    "message": "停止检查和提交，直到你再次启动 Chamber 或下次登录 Windows。"
+  },
+  "appStopped": {
+    "message": "Chamber 应用没有在运行。请重新启动它（npm start，或开启自启后重新登录 Windows）；本页会自动重新连接。"
+  },
+  "passwordNoEncryption": {
+    "message": "无法在本机加密密码，因此没有保存。"
+  },
+  "appUnreachable": {
+    "message": "本机的 Chamber 应用没有在运行，未加入队列。"
+  },
+  "appNotPaired": {
+    "message": "请先在此浏览器中打开一次 Chamber 队列页以连接扩展，未加入队列。"
   },
   "hintPaused": {
     "message": "已暂停，不会上传或提交任何内容。"
@@ -532,7 +553,7 @@
     "message": "无法确定是哪个节点，请在队列页添加"
   },
   "reasonOtherTerm": {
-    "message": "这不是扩展当前跟踪的学期"
+    "message": "这不是 Chamber 当前跟踪的学期"
   },
   "reasonNodeChanged": {
     "message": "平台上该节点已变化，请到平台确认"
@@ -701,13 +722,13 @@
     "message": "已退出 tenten.art 登录"
   },
   "notifyLoggedOutBody": {
-    "message": "自动提交已暂停，队列中的作业正在等待。点击重新登录。"
+    "message": "自动提交已暂停，队列中的作业正在等待。点击打开队列页。"
   },
   "notifyExpiringTitle": {
     "message": "tenten.art 登录即将过期"
   },
   "notifyExpiringBody": {
-    "message": "将于 $P1$ 过期。在网站上重新登录即可继续自动提交。",
+    "message": "将于 $P1$ 过期。开启自动登录，或在网站上重新登录，即可继续自动提交。",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -772,7 +793,7 @@
     }
   },
   "autoLoginHint": {
-    "message": "开启后，24 小时登录到期时扩展会用这个密码自动登录 tenten.art，并恢复网站本身的登录状态。密码以明文保存在本 Chrome 配置文件中，只有本扩展能读取，且只会发送给 tenten.art。密码留空则保持不变。"
+    "message": "开启后，24 小时登录到期时 Chamber 会用这个密码自动登录 tenten.art，扩展也会用它恢复网站本身的登录状态。密码用你的 Windows 账户加密（DPAPI）后只保存在本机，且只会发送给 tenten.art。密码留空则保持不变。"
   },
   "notifyAutoLoginFailedTitle": {
     "message": "自动登录失败"
@@ -798,7 +819,7 @@
     "message": "完整作业未提交"
   },
   "finalDueHint": {
-    "message": "这些作业的节点都已通过，请到网站提交完整作业；扩展不会替你排队提交。"
+    "message": "这些作业的节点都已通过，请到网站提交完整作业；Chamber 不会替你排队提交。"
   },
   "openOnSite": {
     "message": "在网站打开"

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeTerm, ids, item, fakeServer, fakeDeps, setStatus } from './fixtures.mjs';
-import { runTick } from '../extension/src/engine.js';
+import { runTick } from '../app/src/engine.js';
 
 test('a single item submits exactly once across many ticks', async () => {
   const api = fakeServer(makeTerm());
@@ -72,7 +72,7 @@ test('network failure on submit stays in doubt and is never blindly retried', as
   // request lands, but the response is lost
   api.createSubmission = async (...a) => {
     await realPost(...a);
-    const { ApiError } = await import('../extension/src/adapter.js');
+    const { ApiError } = await import('../app/src/adapter.js');
     throw new ApiError(0, null, 'TIMEOUT');
   };
   assert.equal((await runTick(deps)).why, 'submitInDoubt');
@@ -86,7 +86,7 @@ test('network failure on submit stays in doubt and is never blindly retried', as
 test('server rejection blocks the item with the message and is not retried', async () => {
   const term = makeTerm();
   const api = fakeServer(term);
-  api.updateSubmission = async () => { const { ApiError } = await import('../extension/src/adapter.js'); throw new ApiError(200, 400, '提交次数已用完'); };
+  api.updateSubmission = async () => { const { ApiError } = await import('../app/src/adapter.js'); throw new ApiError(200, 400, '提交次数已用完'); };
   term.weeks[0].lessons[0].assignments[0].submissions.push({ submissionId: '1', nodeId: ids.A1n2, status: 'REVIEWED' });
   term.weeks[0].lessons[0].assignments[0].nodes[1].status = 'REVIEWED';
   const deps = fakeDeps(api, [item()]);
@@ -177,7 +177,7 @@ test('sequential nodes: node 2 waits for node 1 approval, then goes', async () =
 
 test('401 marks the session invalid and pauses scheduling', async () => {
   const api = fakeServer(makeTerm());
-  api.weeks = async () => { const { ApiError } = await import('../extension/src/adapter.js'); throw new ApiError(401, null, 'unauthorized'); };
+  api.weeks = async () => { const { ApiError } = await import('../app/src/adapter.js'); throw new ApiError(401, null, 'unauthorized'); };
   const deps = fakeDeps(api, [item()]);
   assert.equal((await runTick(deps)).why, 'sessionInvalid');
   assert.equal(deps.settingsValue.sessionInvalid, true);

@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeTerm, ids, item, target, addRound } from './fixtures.mjs';
-import { findAssignment } from '../extension/src/model.js';
-import { nodeState, normalizeFilter, defaultFilter, DEFAULT_STATES, NODE_STATES } from '../extension/src/picker.js';
+import { findAssignment } from '../app/src/model.js';
+import { nodeState, normalizeFilter, defaultFilter, DEFAULT_STATES, NODE_STATES } from '../app/src/picker.js';
 
 const stateOf = (term, backlog, aid, nodeIndex) => {
   const a = findAssignment(term, aid);

@@ -1,4 +1,4 @@
-// Writes _locales/{en,zh_CN}/messages.json from tools/locales.src.mjs.
+// Writes {app,extension}/_locales/{en,zh_CN}/messages.json from tools/locales.src.mjs.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import rows from './locales.src.mjs';
 
@@ -18,7 +18,11 @@ for (const [key] of rows) {
 }
 for (const [i, lang] of [[1, 'en'], [2, 'zh_CN']]) {
   const out = Object.fromEntries(rows.map((r) => [r[0], toMsg(r[i])]));
-  const dir = new URL(`../extension/_locales/${lang}/`, import.meta.url);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(new URL('messages.json', dir), `${JSON.stringify(out, null, 2)}\n`);
+  // The app (pages, notifications) and the extension (its name, the Chinese strings it
+  // injects into the site) read the same files.
+  for (const root of ['app', 'extension']) {
+    const dir = new URL(`../${root}/_locales/${lang}/`, import.meta.url);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(new URL('messages.json', dir), `${JSON.stringify(out, null, 2)}\n`);
+  }
 }

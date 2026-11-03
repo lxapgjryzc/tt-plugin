@@ -1,0 +1,827 @@
+{
+  "extName": {
+    "message": "Chamber"
+  },
+  "extDescription": {
+    "message": "Adds Chamber queue buttons to tenten.art and connects them to the Chamber app on this computer."
+  },
+  "queuePageTitle": {
+    "message": "Chamber queue"
+  },
+  "slotsFree": {
+    "message": "$P1$ of $P2$ slots free",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "slotsUnknown": {
+    "message": "Slots unknown"
+  },
+  "lastChecked": {
+    "message": "checked $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "agoSeconds": {
+    "message": "$P1$ s ago",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "agoMinutes": {
+    "message": "$P1$ min ago",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "noTab": {
+    "message": "Not logged in. Turn on Automatic login below, or log in on tenten.art in Chrome with the Chamber extension installed."
+  },
+  "sessionInvalid": {
+    "message": "Session expired. Turn on Automatic login below, or log in again on tenten.art in Chrome with the Chamber extension."
+  },
+  "openSite": {
+    "message": "Open tenten.art"
+  },
+  "loadError": {
+    "message": "Could not load: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "inReview": {
+    "message": "In review"
+  },
+  "noneInReview": {
+    "message": "Nothing waiting for review."
+  },
+  "emptyQueue": {
+    "message": "Nothing queued. Drop an image in the queue page."
+  },
+  "pauseAll": {
+    "message": "Pause all"
+  },
+  "resumeAll": {
+    "message": "Resume"
+  },
+  "remove": {
+    "message": "Remove"
+  },
+  "removeItem": {
+    "message": "Remove $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "stopTracking": {
+    "message": "Stop tracking (does not withdraw)"
+  },
+  "controls": {
+    "message": "Controls"
+  },
+  "autoSubmit": {
+    "message": "Auto-submit"
+  },
+  "dryRun": {
+    "message": "Dry run"
+  },
+  "tickEvery": {
+    "message": "Check every"
+  },
+  "seconds": {
+    "message": "$P1$ s",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "reviewHoursOn": {
+    "message": "Only check during review hours"
+  },
+  "reviewHoursHint": {
+    "message": "Beijing time, when TAs review. Outside these hours the regular check pauses (it keeps going for 30 minutes after each window, and checks once right after the computer wakes up). Adding an image, opening this page or Run one check now still checks right away."
+  },
+  "reviewHoursLocal": {
+    "message": "Your time: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "reviewHoursInvalid": {
+    "message": "Use the form 10:00-15:00, 18:00-23:00"
+  },
+  "why_restHours": {
+    "message": "TAs off duty, checks paused"
+  },
+  "language": {
+    "message": "Language"
+  },
+  "langAuto": {
+    "message": "Auto (browser language)"
+  },
+  "langEn": {
+    "message": "English"
+  },
+  "langZh": {
+    "message": "中文"
+  },
+  "runOnce": {
+    "message": "Run one check now"
+  },
+  "quitApp": {
+    "message": "Quit Chamber"
+  },
+  "quitAppConfirm": {
+    "message": "Click again to quit"
+  },
+  "quitAppHint": {
+    "message": "Stops checking and submitting until you start Chamber again or log on to Windows next time."
+  },
+  "appStopped": {
+    "message": "The Chamber app is not running. Start it again (npm start, or log on to Windows with autostart on); this page reconnects by itself."
+  },
+  "passwordNoEncryption": {
+    "message": "The password could not be encrypted on this computer, so it was not saved."
+  },
+  "appUnreachable": {
+    "message": "The Chamber app is not running on this computer; nothing was queued."
+  },
+  "appNotPaired": {
+    "message": "Open the Chamber queue page once in this browser to connect the extension; nothing was queued."
+  },
+  "hintPaused": {
+    "message": "Paused. Nothing will be uploaded or submitted."
+  },
+  "hintDryRun": {
+    "message": "Dry run: the activity log records what would be submitted; nothing is sent."
+  },
+  "hintAuto": {
+    "message": "Auto-submit is on: queued items go out one at a time as slots free up."
+  },
+  "hintManual": {
+    "message": "Auto-submit is off: use \"Run one check now\" to submit the next item."
+  },
+  "backlog": {
+    "message": "Backlog"
+  },
+  "reorderHint": {
+    "message": "Submitted in this order: earliest deadline, then revisions, then required work. Drag (or Alt+Up / Alt+Down) to reorder within the same priority; Delete removes."
+  },
+  "prioDeadline": {
+    "message": "Due $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "prioRevision": {
+    "message": "Revision"
+  },
+  "prioOptional": {
+    "message": "Optional"
+  },
+  "clearFinished": {
+    "message": "Clear finished"
+  },
+  "withdraw": {
+    "message": "Withdraw"
+  },
+  "withdrawReplace": {
+    "message": "Withdraw and replace images"
+  },
+  "withdrawTitle": {
+    "message": "Withdraw this submission?"
+  },
+  "withdrawBody": {
+    "message": "$P1$: this round is deleted from the platform. A round can only be withdrawn before a TA starts reviewing it.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "withdrawQueueLoss": {
+    "message": "It is number $P1$ in the review queue now; anything submitted again goes to the back.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "withdrawQueueLossNoPos": {
+    "message": "Anything submitted again goes to the back of the review queue."
+  },
+  "withdrawFollowUps": {
+    "message": "$P1$ follow-up(s) queued for this node move up and may be sent next.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "withdrawReplaceNote": {
+    "message": "These images are queued in its place, ahead of any follow-ups on this node."
+  },
+  "withdrawConfirm": {
+    "message": "Withdraw"
+  },
+  "withdrawing": {
+    "message": "Withdrawing…"
+  },
+  "cancel": {
+    "message": "Cancel"
+  },
+  "close": {
+    "message": "Close"
+  },
+  "finished": {
+    "message": "Finished"
+  },
+  "followUpsBehind": {
+    "message": "$P1$ follow-up(s) queued",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "moveUp": {
+    "message": "Move up"
+  },
+  "moveDown": {
+    "message": "Move down"
+  },
+  "retry": {
+    "message": "Retry"
+  },
+  "replaceImages": {
+    "message": "Replace images"
+  },
+  "imageCount": {
+    "message": "$P1$ images",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "followUpQueued": {
+    "message": "Follow-up queued"
+  },
+  "reviewImage": {
+    "message": "Review image $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "addItem": {
+    "message": "Add to queue"
+  },
+  "dropAria": {
+    "message": "Choose, drop or paste images"
+  },
+  "dropHint": {
+    "message": "Drop, paste or click to choose up to 3 images"
+  },
+  "dropSub": {
+    "message": "Sent together as one submission. PNG, JPG, WebP or GIF, up to 10 MB each"
+  },
+  "imagesInfo": {
+    "message": "$P1$ of $P2$ images · $P3$ MB",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "imageN": {
+    "message": "Image $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "removeImage": {
+    "message": "Remove image"
+  },
+  "searchNodes": {
+    "message": "Search assignments and nodes"
+  },
+  "filterStatus": {
+    "message": "Status"
+  },
+  "filterType": {
+    "message": "Type"
+  },
+  "filterReset": {
+    "message": "Reset filters"
+  },
+  "filterCanQueue": {
+    "message": "Can queue"
+  },
+  "filterQueued": {
+    "message": "Queued"
+  },
+  "filterInReview": {
+    "message": "In review"
+  },
+  "filterReturned": {
+    "message": "Returned"
+  },
+  "filterApproved": {
+    "message": "Approved"
+  },
+  "filterUnavailable": {
+    "message": "Unavailable"
+  },
+  "pickNode": {
+    "message": "Target node"
+  },
+  "wholeAssignment": {
+    "message": "Whole assignment"
+  },
+  "chained": {
+    "message": "After previous"
+  },
+  "chainedHint": {
+    "message": "Locked now; it waits until the previous node is approved."
+  },
+  "followUp": {
+    "message": "Follow-up"
+  },
+  "followUpHint": {
+    "message": "This node is in review or already queued; this goes out after it, once the node is returned. If the node is approved first, it is not sent."
+  },
+  "noMatches": {
+    "message": "No matching nodes."
+  },
+  "loading": {
+    "message": "Loading…"
+  },
+  "pickerUnavailable": {
+    "message": "Cannot load assignments. Open tenten.art and log in."
+  },
+  "addToQueue": {
+    "message": "Add to queue"
+  },
+  "errNoImage": {
+    "message": "Choose an image first."
+  },
+  "errNotImage": {
+    "message": "That file is not an image."
+  },
+  "errEmptyFile": {
+    "message": "That file is empty."
+  },
+  "errTooLarge": {
+    "message": "Image is larger than 10 MB."
+  },
+  "errImageType": {
+    "message": "Only PNG, JPG, WebP and GIF images are accepted."
+  },
+  "errTooManyImages": {
+    "message": "At most 3 images per submission. Remove some first."
+  },
+  "errNoNode": {
+    "message": "Pick a target node."
+  },
+  "auditLog": {
+    "message": "Activity log"
+  },
+  "stQueued": {
+    "message": "Queued"
+  },
+  "stUploading": {
+    "message": "Uploading"
+  },
+  "stSubmitting": {
+    "message": "Submitting"
+  },
+  "stPending": {
+    "message": "Pending"
+  },
+  "stRevision": {
+    "message": "Revision"
+  },
+  "stDone": {
+    "message": "Approved"
+  },
+  "stBlocked": {
+    "message": "Blocked"
+  },
+  "stFailed": {
+    "message": "Failed"
+  },
+  "stContinued": {
+    "message": "Returned, followed up"
+  },
+  "stSkipped": {
+    "message": "Not sent"
+  },
+  "stWithdrawn": {
+    "message": "Withdrawn"
+  },
+  "nsSubmitted": {
+    "message": "Submitted"
+  },
+  "nsReviewing": {
+    "message": "Reviewing"
+  },
+  "nsReviewed": {
+    "message": "Reviewed"
+  },
+  "nsReturned": {
+    "message": "Returned"
+  },
+  "nsShelved": {
+    "message": "Shelved"
+  },
+  "nsApproved": {
+    "message": "Approved"
+  },
+  "nsLocked": {
+    "message": "Locked"
+  },
+  "nsNone": {
+    "message": "Not submitted"
+  },
+  "typeBasic": {
+    "message": "Basic"
+  },
+  "typeExtended": {
+    "message": "Extended"
+  },
+  "typeAdvanced": {
+    "message": "Advanced"
+  },
+  "typeBiWeekly": {
+    "message": "Bi-weekly"
+  },
+  "typeGraduation": {
+    "message": "Graduation"
+  },
+  "typeDrill": {
+    "message": "Drill"
+  },
+  "typeOther": {
+    "message": "Other"
+  },
+  "reasonAssignmentMissing": {
+    "message": "Assignment no longer exists"
+  },
+  "reasonNodeMissing": {
+    "message": "Node no longer exists"
+  },
+  "reasonTermInactive": {
+    "message": "Term is not active"
+  },
+  "reasonClosed": {
+    "message": "Assignment closed or past deadline"
+  },
+  "reasonBlocked": {
+    "message": "Prerequisite not met"
+  },
+  "reasonLocked": {
+    "message": "Node is locked"
+  },
+  "reasonLockedNoChain": {
+    "message": "Locked: queue or submit the previous node first"
+  },
+  "reasonApproved": {
+    "message": "Node already approved"
+  },
+  "reasonPendingOnNode": {
+    "message": "This node is already waiting for review"
+  },
+  "reasonApprovedBeforeSent": {
+    "message": "Not sent: the node was approved first"
+  },
+  "reasonWithdrawn": {
+    "message": "Withdrawn from the platform"
+  },
+  "reasonWithdrawnElsewhere": {
+    "message": "Withdrawn on the site"
+  },
+  "reasonWithdrawDryRun": {
+    "message": "Dry run is on, so nothing is withdrawn"
+  },
+  "reasonBusy": {
+    "message": "A check is running. Try again in a moment."
+  },
+  "reasonRoundChanged": {
+    "message": "This round changed on the platform. Check it there."
+  },
+  "reasonReviewStarted": {
+    "message": "A TA has started reviewing it, so it can no longer be withdrawn."
+  },
+  "reasonWithdrawInDoubt": {
+    "message": "No answer from the platform. Check on the site whether it was withdrawn; this page updates on the next check."
+  },
+  "reasonFinalSubmission": {
+    "message": "完整作业 cannot be queued; submit it on the site"
+  },
+  "reasonAmbiguousNode": {
+    "message": "Could not tell which node this is; add it on the queue page"
+  },
+  "reasonOtherTerm": {
+    "message": "This term is not the one Chamber follows"
+  },
+  "reasonNodeChanged": {
+    "message": "The node changed on the platform; check it there"
+  },
+  "reasonInterrupted": {
+    "message": "Interrupted, will continue"
+  },
+  "reasonImageMissing": {
+    "message": "Image missing from local storage"
+  },
+  "reasonTooLarge": {
+    "message": "Image is larger than 10 MB"
+  },
+  "reasonUploadRetry": {
+    "message": "Upload failed, retrying later"
+  },
+  "reasonUploadFailed": {
+    "message": "Upload failed"
+  },
+  "reasonServerRejected": {
+    "message": "Rejected by the platform"
+  },
+  "waitSlot": {
+    "message": "Waiting for a free slot"
+  },
+  "waitTurn": {
+    "message": "Waiting its turn"
+  },
+  "waitLocked": {
+    "message": "Waiting for the previous node to be approved"
+  },
+  "waitNodePending": {
+    "message": "Waiting: this node is under review; goes out once it is returned"
+  },
+  "waitSameNode": {
+    "message": "Waiting for the earlier item on this node"
+  },
+  "waitBackoff": {
+    "message": "Waiting before retrying the upload"
+  },
+  "waitAutoOff": {
+    "message": "Ready. Auto-submit is off"
+  },
+  "why_paused": {
+    "message": "Paused"
+  },
+  "why_sessionInvalid": {
+    "message": "Session expired"
+  },
+  "why_noToken": {
+    "message": "Not logged in"
+  },
+  "why_noTerm": {
+    "message": "No active term"
+  },
+  "why_inFlight": {
+    "message": "Submitting"
+  },
+  "why_nothingEligible": {
+    "message": "Queued items are waiting"
+  },
+  "why_empty": {
+    "message": "Queue empty"
+  },
+  "why_atLimit": {
+    "message": "At the slot limit"
+  },
+  "why_autoOff": {
+    "message": "Auto-submit off"
+  },
+  "why_ok": {
+    "message": "Ready"
+  },
+  "why_error": {
+    "message": "Last check failed"
+  },
+  "queueNext": {
+    "message": "Up next for review"
+  },
+  "queueAhead": {
+    "message": "$P1$ ahead, about $P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "queueAheadNoEta": {
+    "message": "$P1$ ahead, no estimate",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "etaMinutes": {
+    "message": "$P1$ min",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "etaHours": {
+    "message": "$P1$ h",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "etaHoursMinutes": {
+    "message": "$P1$ h $P2$ min",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "badgeDismiss": {
+    "message": "Hide for this tab"
+  },
+  "badgeAssignment": {
+    "message": "This assignment"
+  },
+  "badgeLastNode": {
+    "message": "Last picked node"
+  },
+  "badgeNoneYet": {
+    "message": "None yet"
+  },
+  "badgeUnknown": {
+    "message": "Not found in the active term"
+  },
+  "enqueueOnPage": {
+    "message": "Add to Chamber queue"
+  },
+  "enqueueing": {
+    "message": "Adding to the queue…"
+  },
+  "enqueuedOk": {
+    "message": "Queued. It will be submitted when a slot frees up; no need to press the submit button above."
+  },
+  "enqueuedChained": {
+    "message": "Queued after the previous node. It will be submitted once that node is approved."
+  },
+  "enqueuedFollowUp": {
+    "message": "Queued as a follow-up. It will be submitted after this node comes back returned; if the node is approved first, it is not sent."
+  },
+  "enqueuedCloseDialog": {
+    "message": "You can close this dialog."
+  },
+  "enqueueFailed": {
+    "message": "Could not add to the queue"
+  },
+  "reasonSubmittedElsewhere": {
+    "message": "This node was submitted on the site after you queued it. Check there, then Retry or remove."
+  },
+  "notifyLoggedOutTitle": {
+    "message": "Logged out of tenten.art"
+  },
+  "notifyLoggedOutBody": {
+    "message": "Submissions are paused and your queue is waiting. Click to open the queue page."
+  },
+  "notifyExpiringTitle": {
+    "message": "tenten.art login expires soon"
+  },
+  "notifyExpiringBody": {
+    "message": "It expires at $P1$. Turn on Automatic login, or log in again on the site, to keep submissions going.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLogin": {
+    "message": "Automatic login"
+  },
+  "autoLoginEnable": {
+    "message": "Log in automatically"
+  },
+  "loginAccount": {
+    "message": "Phone or email"
+  },
+  "loginPassword": {
+    "message": "Password"
+  },
+  "loginPasswordSaved": {
+    "message": "Password saved"
+  },
+  "loginSave": {
+    "message": "Save"
+  },
+  "loginForget": {
+    "message": "Forget account"
+  },
+  "autoLoginSaving": {
+    "message": "Saving and logging in…"
+  },
+  "autoLoginOff": {
+    "message": "Off. You will be reminded to log in when the 24-hour session runs out."
+  },
+  "autoLoginNeedCreds": {
+    "message": "Enter your account and password, then Save."
+  },
+  "autoLoginReady": {
+    "message": "On. It will log in when the session is about to run out."
+  },
+  "autoLoginOk": {
+    "message": "On. Last automatic login: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLoginFailed": {
+    "message": "Automatic login failed: $P1$. It will try again in 10 minutes.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLoginRejected": {
+    "message": "The site refused the login: $P1$. Fix the account or password and Save again; it will not retry until then.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "autoLoginHint": {
+    "message": "When on, Chamber logs in to tenten.art with this password whenever the 24-hour session runs out, and the extension restores the site's own login with it. The password is encrypted for your Windows account (DPAPI) and stored on this computer only, and is sent only to tenten.art. Leave the password empty to keep the saved one."
+  },
+  "notifyAutoLoginFailedTitle": {
+    "message": "Automatic login failed"
+  },
+  "notifyAutoLoginFailedBody": {
+    "message": "$P1$. Click to check the settings.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "notifyRevision": {
+    "message": "Returned for revision"
+  },
+  "notifyApproved": {
+    "message": "Approved"
+  },
+  "notifySkipped": {
+    "message": "Approved early, follow-up not sent"
+  },
+  "finalDue": {
+    "message": "完整作业 not submitted"
+  },
+  "finalDueHint": {
+    "message": "Every node is approved. Submit the 完整作业 on the site; Chamber does not queue it."
+  },
+  "openOnSite": {
+    "message": "Open on site"
+  }
+}

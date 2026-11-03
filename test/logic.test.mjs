@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { target, makeTerm, ids, item, addRound, setStatus } from './fixtures.mjs';
-import { countPending, isSubmittable, findAssignment, submissionHasFile, selectTerm } from '../extension/src/model.js';
-import { schedule, preflight, backoffMs } from '../extension/src/scheduler.js';
-import { reconcile } from '../extension/src/reconcile.js';
+import { countPending, isSubmittable, findAssignment, submissionHasFile, selectTerm } from '../app/src/model.js';
+import { schedule, preflight, backoffMs } from '../app/src/scheduler.js';
+import { reconcile } from '../app/src/reconcile.js';
 
 const S = { paused: false, autoSubmit: true, sessionInvalid: false };
 
@@ -274,7 +274,7 @@ test('reconcile: a round submitted on the site after queueing blocks the queued 
 });
 
 test('canQueue: follow-ups, locks and chaining', async () => {
-  const { canQueue } = await import('../extension/src/scheduler.js');
+  const { canQueue } = await import('../app/src/scheduler.js');
   const term = makeTerm();
   const A1 = findAssignment(term, ids.A1);
   const [n1, n2, n3] = A1.nodes;

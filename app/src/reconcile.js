@@ -2,7 +2,7 @@
 // Returns a list of { id, patch } to apply. Never decides to submit anything.
 //
 // Called at the start of every tick while holding the tick lock, so any item found in
-// `uploading` or `submitting` belongs to a tick that died (service worker eviction,
+// `uploading` or `submitting` belongs to a tick that died (the app was killed,
 // network timeout). Those are resolved from server state, never from local belief.
 
 import {
@@ -17,7 +17,7 @@ import {
 
 // Final states. continued: returned, then a later item of ours went out on the same node.
 // skipped: never sent because the node was approved first. withdrawn: its round was
-// deleted from the platform (by the extension on request, or on the site).
+// deleted from the platform (by Chamber on request, or on the site).
 const TERMINAL = new Set(['done', 'failed', 'continued', 'skipped', 'withdrawn']);
 
 /**
@@ -148,8 +148,8 @@ export function reconcile({ target, term, backlog }) {
         }
         if (!Number.isInteger(item.roundsAtQueue)) break;
         // Rounds added since this item was queued: our own items' rounds just move the
-        // baseline on (follow-ups, R2.5); any other round was submitted outside the
-        // extension (e.g. the site's own button), and sending ours too would burn another
+        // baseline on (follow-ups, R2.5); any other round was submitted outside
+        // Chamber (e.g. the site's own button), and sending ours too would burn another
         // round, so stop and let the user decide. Withdrawn rounds lower the baseline, so
         // the next outside round is still noticed (R6.7).
         const subs = nodeSubmissions(assignment, item.nodeId);

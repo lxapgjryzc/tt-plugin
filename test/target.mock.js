@@ -1,4 +1,4 @@
-// Same shape as extension/src/target.js, fake origin. Used by unit tests.
+// Same shape as app/src/target.js, fake origin. Used by unit tests.
 export const target = {
   id: 'mock',
   base: 'https://mock.invalid',

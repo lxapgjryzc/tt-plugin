@@ -1,25 +1,29 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-// Minimal chrome.* for the modules under test (storage only).
-const mem = {};
-globalThis.chrome = {
-  storage: {
-    local: {
-      async get(keys) {
-        const ks = keys == null ? Object.keys(mem) : [].concat(keys);
-        return Object.fromEntries(ks.filter((k) => k in mem).map((k) => [k, structuredClone(mem[k])]));
-      },
-      async set(obj) { Object.assign(mem, structuredClone(obj)); },
-      async remove(k) { for (const x of [].concat(k)) delete mem[x]; },
-    },
-  },
+import { openDb } from '../app/src/db.js';
+import { makeKv, KEYS } from '../app/src/kv.js';
+import { makeTokens } from '../app/src/tokens.js';
+import { makeAutoLogin, RETRY_AFTER_MS } from '../app/src/auto-login.js';
+import { ApiError, makeApi } from '../app/src/adapter.js';
+import { target } from './target.mock.js';
+
+// Stand-in for DPAPI: reversible, but never the plain text.
+const secret = {
+  protect: async (t) => `enc:${Buffer.from(t).toString('base64')}`,
+  unprotect: async (c) => Buffer.from(c.slice(4), 'base64').toString(),
 };
 
-const { tryAutoLogin, saveLogin, forgetLogin, loginStatus, autoLoginActive, RETRY_AFTER_MS } = await import('../extension/src/auto-login.js');
-const { KEYS, getSettings, getAudit } = await import('../extension/src/storage/settings.js');
-const { ApiError, makeApi } = await import('../extension/src/adapter.js');
-const { target } = await import('./target.mock.js');
+let kv;
+let login;
+let tryAutoLogin;
+let saveLogin;
+let forgetLogin;
+let loginStatus;
+let autoLoginActive;
+let getSettings;
+let getAudit;
+const mem = new Proxy({}, { get: (_t, k) => kv.get(k) });
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const jwt = (exp) => `${b64url({ alg: 'HS512' })}.${b64url({ sub: '1', exp })}.sig`;
@@ -37,7 +41,13 @@ function fakeApi(behaviour) {
 }
 const okApi = () => fakeApi(() => ({ token: freshToken(), userId: '9', displayName: 'me', roles: ['STUDENT'], passwordSet: true }));
 
-beforeEach(() => { for (const k of Object.keys(mem)) delete mem[k]; });
+beforeEach(() => {
+  kv = makeKv(openDb(':memory:'));
+  login = makeAutoLogin({ kv, secret, tokens: makeTokens(kv) });
+  ({ saveLogin, forgetLogin, loginStatus, autoLoginActive } = login);
+  tryAutoLogin = login.tryAutoLogin;
+  ({ getSettings, getAudit } = kv);
+});
 
 test('off by default: no login attempt', async () => {
   const api = okApi();
@@ -99,10 +109,10 @@ test('network failures retry, but not more than every 10 minutes', async () => {
 test('an empty password field keeps the saved password for the same account', async () => {
   await saveLogin({ enabled: true, account: 'a', password: 'secret' });
   await saveLogin({ enabled: false, account: 'a', password: '' });
-  assert.equal(mem[KEYS.credentials].password, 'secret');
+  assert.equal(await secret.unprotect(mem[KEYS.credentials].passwordEnc), 'secret');
   assert.equal((await getSettings()).autoLogin, false);
   await saveLogin({ enabled: true, account: 'b', password: '' });
-  assert.equal(mem[KEYS.credentials].password, '', 'a different account does not inherit it');
+  assert.equal(mem[KEYS.credentials].passwordEnc, '', 'a different account does not inherit it');
   assert.equal((await loginStatus()).hasPassword, false);
 });
 
@@ -129,4 +139,14 @@ test('login request goes to the password endpoint without an Authorization heade
   assert.equal(seen.init.method, 'POST');
   assert.equal(seen.init.headers.Authorization, undefined);
   assert.deepEqual(JSON.parse(seen.init.body), { account: 'a', password: 'p' });
+});
+
+test('the password is stored only encrypted, and nothing is saved when encryption fails', async () => {
+  await saveLogin({ enabled: true, account: 'a', password: 'hunter2' });
+  assert.equal(JSON.stringify(mem[KEYS.credentials]).includes('hunter2'), false);
+  const broken = makeAutoLogin({ kv, secret: { protect: async () => { throw new Error('no DPAPI'); } }, tokens: makeTokens(kv) });
+  const res = await broken.saveLogin({ enabled: true, account: 'b', password: 'other' });
+  assert.deepEqual(res, { saved: false, reason: 'passwordNoEncryption' });
+  assert.equal(mem[KEYS.credentials].account, 'a', 'previous credentials untouched');
+  assert.equal(JSON.stringify(await broken.loginStatus()).includes('other'), false);
 });

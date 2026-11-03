@@ -2,9 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeTerm, ids, item, fakeServer, fakeDeps, setStatus, addRound } from './fixtures.mjs';
-import { runTick } from '../extension/src/engine.js';
-import { withdrawRound } from '../extension/src/withdraw.js';
-import { ApiError } from '../extension/src/adapter.js';
+import { runTick } from '../app/src/engine.js';
+import { withdrawRound } from '../app/src/withdraw.js';
+import { ApiError } from '../app/src/adapter.js';
 
 const writes = (api) => api.calls.post + api.calls.put;
 const latestId = (term, nodeId = ids.A1n2) => term.weeks[0].lessons[0].assignments[0].submissions.filter((s) => s.nodeId === nodeId).at(-1)?.submissionId;

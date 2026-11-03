@@ -41,5 +41,5 @@ for (const size of [16, 32, 48, 128]) {
     const col = bg.map((b, i) => Math.round(b + (fg[i] - b) * aPip));
     return [...col, Math.round(255 * aSq)];
   });
-  writeFileSync(new URL(`../extension/icons/${size}.png`, import.meta.url), buf);
+  for (const dir of ["extension", "app"]) writeFileSync(new URL(`../${dir}/icons/${size}.png`, import.meta.url), buf);
 }

@@ -4,7 +4,9 @@ import {
 import * as store from '../src/storage/idb.js';
 import { KEYS, getSettings, getAudit } from '../src/storage/settings.js';
 import { target } from '../src/target.js';
-import { listAssignments, findAssignment, findNode, nodeStatus, nodeSubmissions, label, finalSubmissionsDue } from '../src/model.js';
+import {
+  listAssignments, findAssignment, findNode, nodeStatus, nodeSubmissions, label, finalSubmissionsDue, siteNodeUrl, siteLearningUrl,
+} from '../src/model.js';
 import { prioritize, priorityOf, canQueue } from '../src/scheduler.js';
 import { imageProblem, imageSetProblem } from '../src/images.js';
 import { parseReviewHours } from '../src/review-hours.js';
@@ -179,7 +181,7 @@ function itemRow(item, index) {
   el('span', { class: 'grip', 'aria-hidden': 'true' }, icon('grip')),
   thumbFor(item),
   el('div', { class: 'main' },
-    el('div', { class: 'title', text: item.title }),
+    siteLink(siteNodeUrl(target, item.assignmentId, item.nodeId), item.title),
     sub,
     reasonShown ? el('div', { class: 'reason', text: reasonText(item.reason, item.reasonDetail) }) : null,
     ['needs_revision', 'continued'].includes(item.status) && item.teacherFeedback ? el('div', { class: 'feedback', text: item.teacherFeedback }) : null,
@@ -259,7 +261,7 @@ function renderBacklog() {
   const pend = state.snap?.pending || [];
   $('reviewList').replaceChildren(...pend.map((p) => el('li', { class: 'row' },
     el('div', { class: 'main' },
-      el('div', { class: 'title', text: p.label }),
+      p.assignmentId ? siteLink(siteNodeUrl(target, p.assignmentId, p.nodeId), p.label) : el('div', { class: 'title', text: p.label }),
       el('div', { class: 'sub' }, nodeTag(p.status, false), queueText(p.queuePosition, p.estimatedWaitMinutes))))));
   $('reviewEmpty').hidden = pend.length > 0;
 
@@ -268,8 +270,13 @@ function renderBacklog() {
   $('finalDue').hidden = !due.length;
   $('finalList').replaceChildren(...due.map((a) => el('li', { class: 'row' },
     el('div', { class: 'main' },
-      el('div', { class: 'title', text: a.title }),
+      siteLink(siteLearningUrl(target, state.term.termId, a.assignmentId), a.title),
       el('div', { class: 'sub' }, el('span', { class: 'tag', text: t(TYPE_KEYS[a.assignmentType] || 'typeOther') }))))));
+}
+
+// A node or assignment name that opens it on the site in a new tab (requirements R4).
+function siteLink(href, text) {
+  return el('a', { class: 'title site-link', href, target: '_blank', rel: 'noreferrer', title: t('openOnSite'), text });
 }
 
 // Items that are over: removed by "Clear finished".
@@ -554,7 +561,7 @@ function wire() {
   });
   $('bannerAction').addEventListener('click', openSite);
   $('finalOpen').addEventListener('click', () => {
-    chrome.tabs.create({ url: `${target.base}/student/learning${state.term ? `/${state.term.termId}` : ''}` });
+    chrome.tabs.create({ url: siteLearningUrl(target, state.term?.termId) });
   });
   $('clearDone').addEventListener('click', async () => {
     for (const i of state.backlog.filter((x) => FINISHED.has(x.status))) await store.removeItem(i.id);

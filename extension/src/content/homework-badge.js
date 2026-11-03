@@ -12,6 +12,7 @@
   const ROUTE = /^\/student\/assignment\/(\d+)/;
   const LEARNING = /^\/student\/learning\/(\d+)/;
   const FINAL_STEP_TITLE = '完整作业'; // the site's extra step after all nodes; never queued
+  const NODE_FRAGMENT = 'chamber-node'; // same as NODE_FRAGMENT in src/model.js
   const send = (msg) => chrome.runtime.sendMessage(msg).catch(() => null);
 
   // The site is Chinese-only, so injected UI uses the Chinese strings whatever the
@@ -326,6 +327,31 @@
     }
   }
 
+  // ---- open a node from the extension's links (requirements R4) ------------
+  // The site's assignment page has no URL parameter for the node; the extension's links
+  // carry #chamber-node=<nodeId>. Select that step once the page has rendered it, then
+  // drop the fragment without a new history entry.
+  async function focusNodeFromLink() {
+    const m = ROUTE.exec(location.pathname);
+    const want = new URLSearchParams(location.hash.slice(1)).get(NODE_FRAGMENT);
+    if (!m || !want) return;
+    const info = await send({ type: 'chamber:lookup', assignmentId: m[1] });
+    const index = (info?.nodes || []).findIndex((n) => String(n.nodeId) === want);
+    const title = index >= 0 ? info.nodes[index].title : null;
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline && ROUTE.exec(location.pathname)?.[1] === m[1]) {
+      const steps = [...document.querySelectorAll('.node-steps .node-step')];
+      if (steps.length) {
+        const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+        const step = steps.find((s) => norm(s.querySelector('.node-step-title')?.textContent) === norm(title)) || steps[index];
+        step?.click();
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    history.replaceState(history.state, '', location.pathname + location.search);
+  }
+
   // ---- SPA navigation (history API is not observable from the isolated world) ----
   let lastPath = null;
   function check() {
@@ -340,6 +366,7 @@
     const m = ROUTE.exec(location.pathname);
     if (m) render(m[1]);
     else remove();
+    focusNodeFromLink();
   }
 
   send({ type: 'chamber:pageStrings' }).then((s) => {

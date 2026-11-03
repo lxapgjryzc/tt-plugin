@@ -30,6 +30,7 @@ After pulling new code, click the reload button on the extension's card in `chro
 - **Revisions.** When a submission comes back as reviewed / returned / shelved, its item turns into **Revision** with the teacher's feedback and review images. The returned images are never sent again. Queue your revised drawing like any other (on the site or the queue page); once it is sent, the returned item shows **Returned, followed up** and keeps the feedback.
 - **Follow-ups (nodes reviewed in several rounds).** A node that is in review, or already has items in the queue, still accepts new items, tagged **Follow-up**. Each goes out after the one before it, once the node comes back returned. If the node is approved first (the TA approved directly, or you stop there), the remaining follow-ups become **Not sent** and nothing waits on them; later nodes carry on. Write the "more to come" note on the drawing itself, as the site has no note field. See `docs/requirements.md` (R2).
 - **完整作业.** When every node of an assignment is approved and its 完整作业 has not been submitted, the queue page lists it as a reminder. Submit it on the site; it takes no review slot and the extension never submits it.
+- **Open on the site.** Node names on the queue page (queue, In review, 完整作业) are links: they open that node on tenten.art in a new tab and select it there.
 - **Toolbar icon.** Opens the queue page (or switches to it if already open) and runs a check. Its badge shows slots in use (e.g. **1/2**), the number of items needing attention, **||** when paused, or a red **!** when the login has run out.
 - **Floating badge** in the bottom-right of the assignment page: hover it and click to open the queue page for that assignment. × hides it for the tab.
 
@@ -72,7 +73,7 @@ Verified against the live API and the site's front-end bundle. Keep this table u
 | Slot count | Submissions in `SUBMITTED` / `REVIEWING` take a slot. The site counts the last round per assignment; the extension counts the last round per node (can only over-count) |
 | Upload | `POST /api/files/upload`, multipart `file` + `prefix=assignments/`. `data` is an object; its `objectName` is what goes into `fileUrl` |
 | Submit | `POST .../submissions` when the node has no rounds yet, `PUT` when it has. Body `{ nodeId, fileUrl }` |
-| Several images | The learning page sends up to 3 images as one round: each is uploaded, and the object names are joined with `,` into `fileUrl`. Rounds list them in `fileUrls` / `fileObjectNames`. (How `fileObjectName` looks for such a round is unverified; matching splits on `,`.) The assignment page sends one image |
+| Several images | The learning page sends up to 3 images as one round: each is uploaded, and the object names are joined with `,` into `fileUrl`. Rounds list them in `fileUrls` / `fileObjectNames`; `fileObjectName` / `fileUrl` hold the first image only (verified 2026-11-03, two images on a graduation node). The assignment page sends one image |
 | Images | PNG, JPEG, WebP, GIF (assignment page: no GIF), at most 10 MB each |
 | Notes | The submit body has no note field; students write notes on the drawing |
 | Catalog | `GET /api/student/courses/terms/{termId}/catalog`: the same assignments grouped into chapters (`groupTitle`), as on the learning page. Its submit dialog only shows chapter · type label · node title, so the extension resolves the node through this |
@@ -83,6 +84,7 @@ Verified against the live API and the site's front-end bundle. Keep this table u
 | Times | Naive Beijing time, see above |
 | Grouping | All assignments sit under a single lesson in week 0, so the picker groups by assignment |
 | Assignment page | `/student/assignment/{id}`. Current node: `.node-steps .node-step-title.active`; upload box `.upload-zone`; chosen image `img.upload-preview` (blob URL of the original file); submit button `.upload-section .submit-btn` |
+| Links | `/student/assignment/{id}` has no node parameter; the shown node is page state, set by clicking a `.node-step` (locked ones too). `/student/learning/{termId}?assignmentId=…` opens the learning page on that assignment |
 | Learning page | `/student/learning/{termId}`. Submit dialog: `.ant-modal .submit-confirm-body`, context tags `.submit-context .ctx-tag` (chapter, type label, node title), images `img.submit-confirm-preview` (blob URLs, in order) |
 
 ## Layout

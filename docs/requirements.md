@@ -30,8 +30,8 @@ Rounds expose their files as `fileUrls` / `fileObjectNames` arrays.
   earlier ones again. Replacing the images discards stored object names.
 - **R1.4** Recognising our own round on the server (duplicate guard, in-doubt resolution)
   matches **any** of the item's object names against the round's file keys. File keys that
-  contain `,` are split. (**Unverified**: exact shape of `fileObjectName` for a multi-image
-  round; matching works whether it is the first name, the joined string, or absent.)
+  contain `,` are split. (Verified 2026-11-03: a multi-image round lists every image in
+  `fileObjectNames` / `fileUrls`, and `fileObjectName` / `fileUrl` hold the first one.)
 - **R1.5** Queue page: drop, paste or pick adds images to the pending set up to 3 (paste
   appends, like the site's dialog). The set is shown as thumbnails, each removable. *Replace
   images* on an item replaces the whole set (1–3 images).
@@ -127,6 +127,30 @@ withdrawn). It takes no review slot, so queuing it has no value.
   not a graduation project, not closed, and `finalSubmission` is empty, under *完整作业 not
   submitted*, with a link to the site's learning page. Hidden when empty.
 - **R3.2** The extension never submits, updates or withdraws final submissions.
+
+---
+
+## R4. Open the node on the site
+
+### Background
+
+The site's assignment page is `/student/assignment/{assignmentId}`; it has no URL
+parameter for the node. Which node is shown is page state, set by clicking a step in
+`.node-steps` (any step can be clicked, locked ones too). The learning page accepts
+`/student/learning/{termId}?assignmentId=…` and opens on that assignment.
+
+### Requirements
+
+- **R4.1** Everywhere the queue page names a node (backlog rows, *In review* rows), the name
+  is a link that opens that node on the site in a new tab.
+- **R4.2** The link is `/student/assignment/{assignmentId}#chamber-node={nodeId}`. On such a
+  page the content script waits for the step bar (up to 10 s), clicks the step whose title
+  matches the node (falling back to its position), then removes the fragment from the
+  address without adding a history entry. If the node cannot be found it does nothing; the
+  page still shows the assignment.
+- **R4.3** *完整作业 not submitted* rows link to the learning page opened on that assignment.
+- **R4.4** Only the extension's own links carry the fragment; the site's navigation is
+  never changed.
 
 ---
 

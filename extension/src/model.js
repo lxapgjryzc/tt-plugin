@@ -198,6 +198,21 @@ export function resolveDialogNode(catalog, { chapterTitle, typeLabel, nodeTitle 
   return { error: hits.length ? 'reasonAmbiguousNode' : 'reasonNodeMissing' };
 }
 
+// Links into the site (requirements R4). The assignment page has no URL parameter for
+// the node, so the extension's own links carry it in a fragment that the content script
+// reads to select that node. Keep NODE_FRAGMENT in sync with content/homework-badge.js.
+export const NODE_FRAGMENT = 'chamber-node';
+
+export function siteNodeUrl(target, assignmentId, nodeId) {
+  const url = `${target.base}/student/assignment/${encodeURIComponent(assignmentId)}`;
+  return nodeId == null ? url : `${url}#${NODE_FRAGMENT}=${encodeURIComponent(nodeId)}`;
+}
+
+export function siteLearningUrl(target, termId, assignmentId) {
+  const url = `${target.base}/student/learning${termId ? `/${encodeURIComponent(termId)}` : ''}`;
+  return assignmentId ? `${url}?assignmentId=${encodeURIComponent(assignmentId)}` : url;
+}
+
 // Title of the extra step the site shows after every node is approved.
 export const FINAL_STEP_TITLE = '完整作业';
 

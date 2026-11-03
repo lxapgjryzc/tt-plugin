@@ -182,6 +182,57 @@
   "clearFinished": {
     "message": "清除已结束"
   },
+  "withdraw": {
+    "message": "撤回"
+  },
+  "withdrawReplace": {
+    "message": "撤回并更换图片"
+  },
+  "withdrawTitle": {
+    "message": "撤回这次提交？"
+  },
+  "withdrawBody": {
+    "message": "「$P1$」的这一轮会从平台上删除。助教开始批改后就不能撤回了。",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "withdrawQueueLoss": {
+    "message": "现在排在批改队列第 $P1$ 位，重新提交会排到最后。",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "withdrawQueueLossNoPos": {
+    "message": "重新提交会排到批改队列最后。"
+  },
+  "withdrawFollowUps": {
+    "message": "该节点后面排着的 $P1$ 份会往前移，可能接着就提交。",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "withdrawReplaceNote": {
+    "message": "撤回后会用下面这些图重新排队，排在该节点的后续提交前面。"
+  },
+  "withdrawConfirm": {
+    "message": "确认撤回"
+  },
+  "withdrawing": {
+    "message": "正在撤回……"
+  },
+  "cancel": {
+    "message": "取消"
+  },
+  "close": {
+    "message": "关闭"
+  },
   "finished": {
     "message": "已结束"
   },
@@ -351,6 +402,9 @@
   "stSkipped": {
     "message": "未提交"
   },
+  "stWithdrawn": {
+    "message": "已撤回"
+  },
   "nsSubmitted": {
     "message": "待批改"
   },
@@ -425,6 +479,27 @@
   },
   "reasonApprovedBeforeSent": {
     "message": "未提交：节点已先通过"
+  },
+  "reasonWithdrawn": {
+    "message": "已从平台撤回"
+  },
+  "reasonWithdrawnElsewhere": {
+    "message": "已在网站上撤回"
+  },
+  "reasonWithdrawDryRun": {
+    "message": "演练模式下不会撤回"
+  },
+  "reasonBusy": {
+    "message": "正在检查，请稍后再试。"
+  },
+  "reasonRoundChanged": {
+    "message": "平台上这一轮已经变了，请到平台确认。"
+  },
+  "reasonReviewStarted": {
+    "message": "助教已开始批改，不能撤回了。"
+  },
+  "reasonWithdrawInDoubt": {
+    "message": "平台没有响应。请到网站确认是否已撤回，下次检查时本页会更新。"
   },
   "reasonFinalSubmission": {
     "message": "完整作业不能加入队列，请直接在网站上提交"

@@ -25,7 +25,7 @@ After pulling new code, click the reload button on the extension's card in `chro
 - **On the site.** Put your images in the site's own upload box as usual, then click **加入 Chamber 队列** instead of submitting. On an assignment page the button sits below **提交作业** (one image, like the site there); on the course learning page it appears inside the **确认提交作业** dialog and queues all of the dialog's images (up to 3) for the node the dialog names. The site's own buttons still submit immediately. If you queue a node and then also submit it directly on the site, the queued item stops and tells you instead of submitting a second time.
 - **Queue page.** Drop, paste or pick 1–3 images (PNG, JPG, WebP or GIF, 10 MB each; they go out together as one submission, in the order shown), choose the target node, and click **Add to queue**. Approved nodes, and assignments where nothing can be queued right now (closed, prerequisite missing, every open node locked or already queued), are hidden unless you tick **Show all**. Other nodes that cannot be submitted are greyed out; hover for the reason. A locked node can be queued if the node before it is already queued or under review; it waits until that node is approved.
 - **Queue page sections.** *Backlog* holds what has not been sent yet, or came back and needs you. *In review* lists everything waiting for a TA on the platform (also rounds submitted on the site); rounds the extension sent show their images and how many follow-ups are queued behind them. *Finished* (approved, followed up, not sent) is collapsed at the bottom.
-- **Replacing a drawing in review** is not possible: the site only lets you withdraw a round that is not being reviewed yet and submit again, which goes to the back of the review queue. The extension never withdraws.
+- **Withdrawing.** A round still *Submitted* (no TA has opened it) shows **撤回 / Withdraw** and **Withdraw and replace images** under *In review*, also for rounds submitted on the site. After a confirmation that shows the queue position you lose, the round is deleted from the platform; with a replacement, the new images are queued in its place, ahead of follow-ups on that node. The site has no way to swap images in place, so a resubmission always goes to the back of the review queue. A round withdrawn on the site is picked up too (the item shows **Withdrawn**). See `docs/requirements.md` (R6).
 - **Submission order.** When a slot frees up, the next item is picked by: earliest deadline → revisions (a returned node blocks every later node) → required before optional → your own order. The queue page lists items in that order and tags them **Due MM-DD**, **Revision**, **Optional**. Drag (or Alt+↑/↓) to reorder within the same priority; Delete removes.
 - **Updating a queued drawing.** Queued items have **Replace images** on the queue page. Locked nodes queued behind an earlier node go out automatically once that node is approved, so if a returned earlier node means a later drawing needs changes, replace it before then.
 - **Review hours.** TAs only review at certain times (measured from the review history: 10:00–15:00 and 18:00–23:00 Beijing time, every day). Outside them no slot can free up, so the regular check pauses, continuing 30 minutes past each window so a slot freed by the last review is still filled at once. Anything you do (adding an image, clicking the toolbar icon, Run one check now, visiting the site) still checks immediately, since the review queue is ordered by submission time. Edit the hours or turn this off under Controls; your local times are shown next to them.
@@ -53,7 +53,7 @@ A duplicate submission burns a round on the platform and cannot be undone, so:
 - If the submit request times out or the network drops, the item stays in **Submitting** and is not retried. The next check decides from the platform's data: if a new round appeared on the node (matched by file name, or simply because the count went up) it counts as submitted; only if there is none does the item go back to the queue, reusing the uploaded file.
 - A round submitted for the node outside the extension after the item was queued stops the item (**Blocked**) until you decide.
 - An explicit rejection from the platform marks the item **Blocked** with the platform's message and waits for you to press **Retry**.
-- There is no code that withdraws (DELETEs) a submission.
+- Withdrawing (`DELETE`) happens only when you confirm it for one specific round, never automatically and never retried. Right before the request, holding the same lock as the checks, the extension re-reads the platform and goes ahead only if that exact round is still the node's latest and still *Submitted*; afterwards it confirms the round is gone. Dry run never withdraws.
 
 ## Fix included: times on the site
 
@@ -81,6 +81,7 @@ Verified against the live API and the site's front-end bundle. Keep this table u
 | Catalog | `GET /api/student/courses/terms/{termId}/catalog`: the same assignments grouped into chapters (`groupTitle`), as on the learning page. Its submit dialog only shows chapter · type label · node title, so the extension resolves the node through this |
 | 完整作业 | After every node is approved (not for graduation projects): `POST`/`PUT`/`DELETE /student/assignments/{id}/final-submission` `{ fileUrl }`, shown as `finalSubmission` on the assignment. Takes no review slot. The extension only reminds |
 | Review queue | Pending rounds carry `queuePosition` and `estimatedWaitMinutes` |
+| Withdraw | `DELETE /student/assignments/{id}/submissions?nodeId=…` deletes the node's latest round; the site offers it only while that round is `SUBMITTED`. The node falls back to its previous round's status. No call replaces a round's images |
 | Closed | `status === "CLOSED"`, or past `deadline` (term end date 23:59:59 if there is none) |
 | IDs | 19-digit strings, beyond JS safe integers; never convert to Number |
 | Times | Naive Beijing time, see above |
@@ -103,6 +104,7 @@ extension/            the folder Chrome loads (runtime files only)
     scheduler.js      pure: what to do this check, priority order, queue eligibility
     reconcile.js      pure: correct the local queue from platform data
     engine.js         one full check, all side effects injected (testable in Node)
+    withdraw.js       a confirmed withdrawal (the only DELETE), same injected deps
     background.js     service worker: alarm, messages, badge, notifications
     i18n.js           language selection on top of _locales
     token-bridge.js   reads the session token from the page

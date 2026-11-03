@@ -134,6 +134,20 @@
     </details>
   </div>
   <input id="replaceFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+  <input id="withdrawFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+
+  <dialog id="withdrawDialog" class="confirm" aria-labelledby="wdTitle">
+    <h2 id="wdTitle" data-i18n="withdrawTitle"></h2>
+    <p id="wdBody"></p>
+    <p id="wdQueue" class="accent"></p>
+    <p id="wdNext" class="muted"></p>
+    <div id="wdPreviews" class="previews"></div>
+    <p id="wdError" class="accent" role="alert"></p>
+    <div class="confirm-actions">
+      <button id="wdCancel" type="button" data-i18n="cancel"></button>
+      <button id="wdConfirm" type="button" class="primary danger" data-i18n="withdrawConfirm"></button>
+    </div>
+  </dialog>
   <script type="module" src="options.js"></script>
 </body>
 </html>

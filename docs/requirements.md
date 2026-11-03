@@ -176,11 +176,71 @@ stored items and scheduling do not change.
 
 ---
 
+## R6. Withdrawing a submission
+
+### Background
+
+`DELETE /api/student/assignments/{assignmentId}/submissions?nodeId={nodeId}` deletes the
+**latest round** of that node (no `nodeId` for node-less work). The site offers it only
+while that round is SUBMITTED; once a TA starts (REVIEWING) it cannot be withdrawn. The
+round disappears, the node falls back to its previous round's status, and the review slot
+frees up. Submitting again creates a new round at the back of the review queue (the queue
+is ordered by submission time), so a withdrawal always costs the queue position. There is
+no way to replace a round's images in place.
+
+A withdrawal deletes data on the platform, so it is the one write besides submitting, and
+it must be at least as guarded as submitting.
+
+### Requirements
+
+- **R6.1 Where.** *In review* rows whose round is SUBMITTED offer **Withdraw** and
+  **Withdraw and replace images**. This includes rounds submitted on the site. REVIEWING
+  rounds show neither.
+- **R6.2 Only on explicit confirmation.** Each action opens a confirmation that names the
+  node and says: the round is deleted from the platform; its queue position (shown) is
+  lost; for a plain withdraw, follow-ups queued behind it move up and may be sent next; for
+  a replacement, the new images (shown) are queued ahead of those follow-ups. Replacement
+  images are chosen and checked (R1.2) *before* the confirmation, so cancelling the file
+  dialog never withdraws anything. Nothing else in the extension ever withdraws: no
+  automatic path, no retry.
+- **R6.3 Guarded write.** The service worker performs it while holding the tick lock (so no
+  check can submit to the node meanwhile), re-reads the platform right before the request,
+  and sends the `DELETE` only if the node's latest round is still exactly the confirmed one
+  (same `submissionId`) and still SUBMITTED. Otherwise it refuses with the reason (review
+  started / the round changed). After the request it re-reads and confirms the round is
+  gone. Dry run refuses (it never writes to the platform). Every attempt and its outcome
+  is in the activity log.
+- **R6.4 Outcome.**
+  - Plain withdraw: our item for that round becomes **Withdrawn** (finished, R5.3).
+  - Replace: our item for that round goes back to *queued* with the new images and keeps
+    its place in the order, so it goes before follow-ups on the node. If the round was not
+    ours, a new item is queued ahead of any follow-ups on the node.
+  - The check runs right away, so the freed slot is used.
+- **R6.5 In doubt.** If the `DELETE` response is lost, nothing is assumed: the user is told
+  to check, replacement images are discarded, and the next check settles the item from the
+  platform (R6.6).
+- **R6.6 Withdrawn elsewhere.** A sent item whose round no longer exists (withdrawn on the
+  site, or an in-doubt withdrawal that landed) becomes **Withdrawn** instead of waiting
+  forever.
+- **R6.7 Baseline after a withdrawal.** When rounds disappear, queued items on the node
+  lower their submitted-elsewhere baseline (R2.5) to the current round count, so a later
+  round from outside the extension is still noticed.
+
+### Scenarios that tests must cover
+
+1. Withdraw our SUBMITTED round → one `DELETE`; item Withdrawn; slot freed; a follow-up on
+   the node is sent next.
+2. Withdraw and replace → item queued with the new images and sent before the follow-up.
+3. Round is REVIEWING, or a different round is latest → refused, no `DELETE`.
+4. Dry run → refused, no `DELETE`.
+5. `DELETE` lost in transit but applied → item Withdrawn on the next check; not applied →
+   item stays in review.
+6. Round withdrawn on the site → item Withdrawn; follow-up baseline lowered; a later round
+   submitted on the site still blocks the follow-up.
+
+---
+
 ## Out of scope
 
-- Withdrawing submissions (deliberately never done).
-- Replacing the images of a round in review. The site has no such call: a SUBMITTED round
-  can only be withdrawn (`DELETE`, the round disappears) and submitted again, which puts it
-  at the back of the review queue; a REVIEWING round cannot be touched. The extension never
-  withdraws.
+- Withdrawing or replacing a 完整作业 (R3.2).
 - Grouping the node picker by chapter.

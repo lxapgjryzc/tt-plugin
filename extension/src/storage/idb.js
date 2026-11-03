@@ -88,26 +88,93 @@ function deleteImages(tx, ids) {
   for (const id of ids || []) tx.objectStore('images').delete(id);
 }
 
-// Adds the images + one backlog item atomically at the end of the queue.
-// `images` is [{ blob, name }] in submission order.
-// `roundsAtQueue` is how many rounds the node had on the server when this drawing was
-// queued; reconcile uses it to notice a round submitted outside the extension.
-export async function addItem({ images, assignmentId, nodeId, title, roundsAtQueue = null }) {
-  const db = await open();
-  const now = new Date().toISOString();
-  const existing = await listBacklog();
-  const order = existing.reduce((m, i) => Math.max(m, i.order ?? 0), 0) + 1;
-  const tx = db.transaction(['images', 'backlog'], 'readwrite');
-  const item = {
-    id: uid(), imageIds: putImages(tx, images, now), assignmentId: String(assignmentId), nodeId: nodeId === null ? null : String(nodeId),
+// A fresh queued item. `roundsAtQueue` is how many rounds the node had on the server when
+// this drawing was queued; reconcile uses it to notice a round submitted outside the
+// extension.
+function newItem({ assignmentId, nodeId, title, roundsAtQueue = null }, imageIds, order, now) {
+  return {
+    id: uid(), imageIds, assignmentId: String(assignmentId), nodeId: nodeId === null ? null : String(nodeId),
     title, status: 'queued', reason: null, objectNames: [], submissionId: null, roundsBefore: null,
     serverStatus: null, queuePosition: null, estimatedWaitMinutes: null,
     teacherFeedback: null, reviewFileUrls: [], attempts: 0, nextAttemptAt: null, roundsAtQueue,
     order, createdAt: now, updatedAt: now,
   };
+}
+
+// The same item, queued again with other images; it keeps its id and place in the order.
+function requeued(cur, imageIds, roundsAtQueue, now) {
+  return {
+    ...cur, imageIds, status: 'queued', reason: null, objectNames: [], submissionId: null, roundsBefore: null,
+    serverStatus: null, queuePosition: null, estimatedWaitMinutes: null, attempts: 0, nextAttemptAt: null,
+    reasonDetail: null, roundsAtQueue, updatedAt: now,
+  };
+}
+
+const lastOrder = (items) => items.reduce((m, i) => Math.max(m, i.order ?? 0), 0);
+
+// Adds the images + one backlog item atomically at the end of the queue.
+// `images` is [{ blob, name }] in submission order.
+export async function addItem({ images, ...fields }) {
+  const db = await open();
+  const now = new Date().toISOString();
+  const order = lastOrder(await listBacklog()) + 1;
+  const tx = db.transaction(['images', 'backlog'], 'readwrite');
+  const item = newItem(fields, putImages(tx, images, now), order, now);
   tx.objectStore('backlog').put(item);
   await done(tx);
   return item;
+}
+
+// Images stored ahead of a decision (e.g. a withdrawal's replacement, R6). They belong to
+// no item until attached with addItemWithImages / requeueWithImages, or are discarded.
+export async function stageImages(images) {
+  const db = await open();
+  const tx = db.transaction('images', 'readwrite');
+  const ids = putImages(tx, images, new Date().toISOString());
+  await done(tx);
+  return ids;
+}
+
+export async function discardImages(ids) {
+  const db = await open();
+  const tx = db.transaction('images', 'readwrite');
+  deleteImages(tx, ids);
+  await done(tx);
+}
+
+// Queue already stored images as a new item, ahead of the queued items on the same node
+// (so it goes before follow-ups there), or at the end if there are none.
+export async function addItemWithImages({ imageIds, ...fields }) {
+  const db = await open();
+  const now = new Date().toISOString();
+  const all = await listBacklog();
+  const aid = String(fields.assignmentId);
+  const nid = fields.nodeId === null ? null : String(fields.nodeId);
+  const siblings = all.filter((i) => i.assignmentId === aid && i.nodeId === nid && i.status === 'queued');
+  const order = siblings.length ? Math.min(...siblings.map((i) => i.order ?? 0)) - 0.5 : lastOrder(all) + 1;
+  const item = newItem(fields, imageIds, order, now);
+  const tx = db.transaction('backlog', 'readwrite');
+  tx.objectStore('backlog').put(item);
+  await done(tx);
+  return item;
+}
+
+// Put already stored images on an item and queue it again (compare-and-set on status).
+export async function requeueWithImages(id, imageIds, roundsAtQueue, expectStatus) {
+  const db = await open();
+  const tx = db.transaction(['images', 'backlog'], 'readwrite');
+  const backlog = tx.objectStore('backlog');
+  const cur = await reqP(backlog.get(id));
+  if (!cur || ![].concat(expectStatus).includes(cur.status)) {
+    tx.abort();
+    return null;
+  }
+  const now = new Date().toISOString();
+  deleteImages(tx, cur.imageIds);
+  const next = requeued(cur, imageIds, roundsAtQueue, now);
+  backlog.put(next);
+  await done(tx);
+  return next;
 }
 
 // Merge a patch into an item. `expectStatus` makes it a compare-and-set.
@@ -137,14 +204,9 @@ export async function replaceImages(id, images, roundsAtQueue = null) {
   }
   const now = new Date().toISOString();
   deleteImages(tx, cur.imageIds);
-  const next = {
-    ...cur, imageIds: putImages(tx, images, now), status: 'queued', reason: null, objectNames: [], submissionId: null, roundsBefore: null,
-    serverStatus: null, queuePosition: null, estimatedWaitMinutes: null, attempts: 0, nextAttemptAt: null,
-    reasonDetail: null, roundsAtQueue, updatedAt: now,
-  };
-  backlog.put(next);
+  backlog.put(requeued(cur, putImages(tx, images, now), roundsAtQueue, now));
   await done(tx);
-  return next;
+  return reqP(db.transaction('backlog').objectStore('backlog').get(id));
 }
 
 export async function removeItem(id) {

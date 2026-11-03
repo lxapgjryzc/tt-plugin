@@ -272,7 +272,7 @@ function renderBacklog() {
   $('finishedCount').textContent = String(finished.length);
   $('finishedList').replaceChildren(...finished.map((item) => compactRow(item, {
     sub: [itemTag(item.status)],
-    reason: item.status === 'skipped' ? reasonText(item.reason) : null,
+    reason: ['skipped', 'withdrawn'].includes(item.status) ? reasonText(item.reason) : null,
     feedback: item.teacherFeedback,
     removeTitle: t('remove'),
   })));
@@ -306,33 +306,109 @@ function renderReview() {
 
   $('reviewList').replaceChildren(...rows.map(({ p, item }) => {
     const status = p?.status ?? item.serverStatus;
-    const sub = [nodeTag(status, false), queueText(p?.queuePosition ?? item?.queuePosition, p?.estimatedWaitMinutes ?? item?.estimatedWaitMinutes)];
+    const queuePosition = p?.queuePosition ?? item?.queuePosition;
+    const sub = [nodeTag(status, false), queueText(queuePosition, p?.estimatedWaitMinutes ?? item?.estimatedWaitMinutes)];
     const behind = state.backlog.filter((i) => WAITING.has(i.status) && nodeKey(i) === nodeKey(p ?? item)).length;
     if (behind) sub.push(el('span', { class: 'tag', 'data-tone': 'faint', text: t('followUpsBehind', [String(behind)]) }));
-    if (item) return compactRow(item, { title: p?.label, sub, removeTitle: t('stopTracking') });
+    // Only a round no TA has opened yet can be withdrawn (R6.1).
+    const round = {
+      assignmentId: p?.assignmentId ?? item.assignmentId, nodeId: p ? p.nodeId : item.nodeId,
+      submissionId: p?.submissionId ?? item?.submissionId, label: p?.label ?? item.title, queuePosition, behind,
+    };
+    const actions = status === 'SUBMITTED' && round.submissionId ? el('div', { class: 'row-actions' },
+      el('button', { type: 'button', text: t('withdraw'), onclick: () => askWithdraw(round, null) }),
+      el('button', { type: 'button', text: t('withdrawReplace'), onclick: () => pickWithdrawReplacement(round) })) : null;
+    if (item) return compactRow(item, { title: p?.label, sub, actions, removeTitle: t('stopTracking') });
     return el('li', { class: 'row' },
       el('div', { class: 'main' },
         p.assignmentId ? siteLink(siteNodeUrl(target, p.assignmentId, p.nodeId), p.label) : el('div', { class: 'title', text: p.label }),
-        el('div', { class: 'sub' }, ...sub)));
+        el('div', { class: 'sub' }, ...sub),
+        actions));
   }));
   $('reviewEmpty').hidden = rows.length > 0;
 }
 
 // A row for an item outside the backlog: no reordering, only removal.
-function compactRow(item, { title, sub = [], reason = null, feedback = null, removeTitle }) {
+function compactRow(item, { title, sub = [], reason = null, feedback = null, actions = null, removeTitle }) {
   return el('li', { class: 'row', 'data-id': item.id },
     thumbFor(item),
     el('div', { class: 'main' },
       siteLink(siteNodeUrl(target, item.assignmentId, item.nodeId), title || item.title),
       el('div', { class: 'sub' }, ...sub),
       reason ? el('div', { class: 'reason', text: reason }) : null,
-      feedback ? el('div', { class: 'feedback', text: feedback }) : null),
+      feedback ? el('div', { class: 'feedback', text: feedback }) : null,
+      actions),
     el('div', { class: 'tools' },
       el('button', { class: 'icon', type: 'button', title: removeTitle, 'aria-label': t('removeItem', [item.title]), onclick: () => remove(item) }, icon('x'))));
 }
 
 // Items that are over: removed by "Clear finished".
-const FINISHED = new Set(['done', 'continued', 'skipped']);
+const FINISHED = new Set(['done', 'continued', 'skipped', 'withdrawn']);
+
+// ---------------------------------------------------------------------------
+// Withdraw (requirements R6). Replacement images are picked and checked first, so
+// cancelling the file dialog never withdraws anything; then the user confirms the exact
+// round in a dialog; the service worker re-checks it before deleting.
+
+let withdrawing = null; // { round, files }
+
+function pickWithdrawReplacement(round) {
+  withdrawing = { round, files: null };
+  $('withdrawFile').value = '';
+  $('withdrawFile').click();
+}
+
+function askWithdraw(round, files) {
+  withdrawing = { round, files };
+  const d = $('withdrawDialog');
+  $('wdBody').textContent = t('withdrawBody', [round.label]);
+  $('wdQueue').textContent = round.queuePosition ? t('withdrawQueueLoss', [String(round.queuePosition)]) : t('withdrawQueueLossNoPos');
+  $('wdNext').textContent = files ? t('withdrawReplaceNote') : round.behind ? t('withdrawFollowUps', [String(round.behind)]) : '';
+  $('wdNext').hidden = !$('wdNext').textContent;
+  for (const img of $('wdPreviews').querySelectorAll('img')) URL.revokeObjectURL(img.src);
+  $('wdPreviews').replaceChildren(...(files || []).map((f, i) => el('div', { class: 'preview' },
+    el('img', { src: URL.createObjectURL(f), alt: t('imageN', [String(i + 1)]) }))));
+  $('wdPreviews').hidden = !files;
+  $('wdError').textContent = '';
+  $('wdConfirm').hidden = false;
+  $('wdConfirm').disabled = false;
+  $('wdCancel').textContent = t('cancel');
+  d.showModal();
+}
+
+async function confirmWithdraw() {
+  const { round, files } = withdrawing || {};
+  if (!round) return;
+  $('wdConfirm').disabled = true;
+  $('wdError').textContent = t('withdrawing');
+  let replacement = null;
+  if (files) {
+    const a = state.term ? findAssignment(state.term, round.assignmentId) : null;
+    const n = a && round.nodeId ? findNode(a, round.nodeId) : null;
+    replacement = {
+      imageIds: await store.stageImages(files.map((f) => ({ blob: f, name: fileName(f) }))),
+      title: a ? label(a, n) : round.label,
+    };
+  }
+  // The service worker discards staged images itself if it refuses.
+  const res = await send('chamber:withdraw', {
+    assignmentId: round.assignmentId, nodeId: round.nodeId, submissionId: round.submissionId, replacement,
+  });
+  if (res?.ok) {
+    $('withdrawDialog').close();
+    withdrawing = null;
+    await refresh({ tree: true });
+    return;
+  }
+  showWithdrawError(reasonText(res?.reason || 'reasonServerRejected', res?.detail));
+  await refresh({ tree: true });
+}
+
+function showWithdrawError(text) {
+  $('wdError').textContent = text;
+  $('wdConfirm').hidden = true;
+  $('wdCancel').textContent = t('close');
+}
 
 // ---------------------------------------------------------------------------
 // Add: image
@@ -646,6 +722,16 @@ function wire() {
     state.replaceId = null;
     await itemsChanged();
   });
+
+  $('withdrawFile').addEventListener('change', (e) => {
+    const files = [...e.target.files];
+    if (!files.length || !withdrawing) return;
+    const err = imageSetProblem(target, files);
+    askWithdraw(withdrawing.round, err ? null : files);
+    if (err) showWithdrawError(t(err)); // nothing is withdrawn with a bad image set
+  });
+  $('wdConfirm').addEventListener('click', confirmWithdraw);
+  $('wdCancel').addEventListener('click', () => $('withdrawDialog').close());
 
   $('search').addEventListener('input', renderPicker);
   $('showAll').addEventListener('change', renderPicker);

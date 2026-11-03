@@ -182,6 +182,57 @@
   "clearFinished": {
     "message": "Clear finished"
   },
+  "withdraw": {
+    "message": "Withdraw"
+  },
+  "withdrawReplace": {
+    "message": "Withdraw and replace images"
+  },
+  "withdrawTitle": {
+    "message": "Withdraw this submission?"
+  },
+  "withdrawBody": {
+    "message": "$P1$: this round is deleted from the platform. A round can only be withdrawn before a TA starts reviewing it.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "withdrawQueueLoss": {
+    "message": "It is number $P1$ in the review queue now; anything submitted again goes to the back.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "withdrawQueueLossNoPos": {
+    "message": "Anything submitted again goes to the back of the review queue."
+  },
+  "withdrawFollowUps": {
+    "message": "$P1$ follow-up(s) queued for this node move up and may be sent next.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "withdrawReplaceNote": {
+    "message": "These images are queued in its place, ahead of any follow-ups on this node."
+  },
+  "withdrawConfirm": {
+    "message": "Withdraw"
+  },
+  "withdrawing": {
+    "message": "Withdrawing…"
+  },
+  "cancel": {
+    "message": "Cancel"
+  },
+  "close": {
+    "message": "Close"
+  },
   "finished": {
     "message": "Finished"
   },
@@ -351,6 +402,9 @@
   "stSkipped": {
     "message": "Not sent"
   },
+  "stWithdrawn": {
+    "message": "Withdrawn"
+  },
   "nsSubmitted": {
     "message": "Submitted"
   },
@@ -425,6 +479,27 @@
   },
   "reasonApprovedBeforeSent": {
     "message": "Not sent: the node was approved first"
+  },
+  "reasonWithdrawn": {
+    "message": "Withdrawn from the platform"
+  },
+  "reasonWithdrawnElsewhere": {
+    "message": "Withdrawn on the site"
+  },
+  "reasonWithdrawDryRun": {
+    "message": "Dry run is on, so nothing is withdrawn"
+  },
+  "reasonBusy": {
+    "message": "A check is running. Try again in a moment."
+  },
+  "reasonRoundChanged": {
+    "message": "This round changed on the platform. Check it there."
+  },
+  "reasonReviewStarted": {
+    "message": "A TA has started reviewing it, so it can no longer be withdrawn."
+  },
+  "reasonWithdrawInDoubt": {
+    "message": "No answer from the platform. Check on the site whether it was withdrawn; this page updates on the next check."
   },
   "reasonFinalSubmission": {
     "message": "完整作业 cannot be queued; submit it on the site"

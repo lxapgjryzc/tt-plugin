@@ -84,6 +84,14 @@ li.row[draggable="true"]:focus-visible { outline-offset: -2px; }
 .add-foot { display: flex; gap: calc(var(--u) * 2); align-items: center; justify-content: space-between; margin-top: calc(var(--u) * 2); }
 #addError { flex: 1; overflow-wrap: anywhere; }
 
+dialog.confirm { max-width: 440px; width: calc(100% - 32px); border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); color: var(--fg); padding: calc(var(--u) * 3); }
+dialog.confirm::backdrop { background: rgb(0 0 0 / 0.4); }
+dialog.confirm h2 { margin: 0 0 var(--u); font-size: 16px; }
+dialog.confirm p { margin: var(--u) 0; overflow-wrap: anywhere; }
+dialog.confirm p:empty { display: none; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: var(--u); margin-top: calc(var(--u) * 2); }
+
 .finished summary { cursor: pointer; list-style: none; }
 .finished summary::-webkit-details-marker { display: none; }
 .finished summary .label::before { content: "▸ "; }

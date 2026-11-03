@@ -4,6 +4,7 @@
 import { target } from './target.js';
 import { makeApi } from './adapter.js';
 import { runTick } from './engine.js';
+import { withdrawRound } from './withdraw.js';
 import { selectTerm, listAssignments, countPending, findAssignment, findNode, nodeSubmissions, label, resolveDialogNode } from './model.js';
 import { canQueue, needsAttention } from './scheduler.js';
 import { imageSetProblem } from './images.js';
@@ -301,6 +302,18 @@ const handlers = {
     await checkSession();
     broadcast();
     return loginStatus();
+  },
+  // Queue page only, after the user confirmed this exact round (requirements R6).
+  // Replacement images were stored by the page beforehand; they are discarded on refusal.
+  'chamber:withdraw': async ({ assignmentId, nodeId, submissionId, replacement }, sender) => {
+    if (!fromExtensionPage(sender)) return null;
+    await originRuleReady;
+    const res = await withdrawRound(deps, { assignmentId, nodeId, submissionId, replacement: replacement || null });
+    if (!res.ok && replacement?.imageIds?.length) await store.discardImages(replacement.imageIds);
+    await refreshBadge();
+    broadcast();
+    if (res.ok) tickSoon(300); // use the freed slot
+    return res;
   },
   'chamber:pageNav': async () => { tickSoon(); return { ok: true }; },
   // tenten.art is Chinese-only, so everything injected into it uses PAGE_LOCALE.

@@ -16,8 +16,9 @@ import {
 } from './model.js';
 
 // Final states. continued: returned, then a later item of ours went out on the same node.
-// skipped: never sent because the node was approved first.
-const TERMINAL = new Set(['done', 'failed', 'continued', 'skipped']);
+// skipped: never sent because the node was approved first. withdrawn: its round was
+// deleted from the platform (by the extension on request, or on the site).
+const TERMINAL = new Set(['done', 'failed', 'continued', 'skipped', 'withdrawn']);
 
 /**
  * Ids of the rounds on this node that our own items made: those carrying files we
@@ -50,7 +51,9 @@ function trackedRound(item, assignment) {
   }
   // A new round appeared on this node since we started submitting. Even if the file
   // key does not match, it must be treated as ours: resubmitting would burn a round.
-  if (Number.isInteger(item.roundsBefore) && subs.length > item.roundsBefore) return subs[item.roundsBefore];
+  // Only while we do not know our round yet: once we do, a different round at that
+  // index means ours was withdrawn and someone else submitted.
+  if (!item.submissionId && Number.isInteger(item.roundsBefore) && subs.length > item.roundsBefore) return subs[item.roundsBefore];
   return null;
 }
 
@@ -107,6 +110,9 @@ export function reconcile({ target, term, backlog }) {
         const sub = trackedRound(item, assignment);
         if (sub) push(item, patchFromRound(target, item, sub));
         else if (nodeStatus(assignment, node) === target.doneStatus) push(item, { status: 'done', reason: null });
+        // Our round is gone: withdrawn on the site, or a withdrawal whose response was
+        // lost. Nothing is left to wait for (R6.6).
+        else if (item.submissionId) push(item, { status: 'withdrawn', reason: 'reasonWithdrawnElsewhere' });
         break;
       }
       case 'submitting': {
@@ -144,10 +150,11 @@ export function reconcile({ target, term, backlog }) {
         // Rounds added since this item was queued: our own items' rounds just move the
         // baseline on (follow-ups, R2.5); any other round was submitted outside the
         // extension (e.g. the site's own button), and sending ours too would burn another
-        // round, so stop and let the user decide.
+        // round, so stop and let the user decide. Withdrawn rounds lower the baseline, so
+        // the next outside round is still noticed (R6.7).
         const subs = nodeSubmissions(assignment, item.nodeId);
         const own = ownRoundIds(backlog, assignment, item.nodeId);
-        let base = item.roundsAtQueue;
+        let base = Math.min(item.roundsAtQueue, subs.length);
         while (base < subs.length && own.has(String(subs[base].submissionId))) base++;
         if (base < subs.length) push(item, { status: 'blocked', reason: 'reasonSubmittedElsewhere' });
         else if (base !== item.roundsAtQueue) push(item, { roundsAtQueue: base });

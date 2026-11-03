@@ -22,6 +22,9 @@ export function makePaths(target) {
     upload: () => `${api}/files/upload`,
     login: () => `${api}/auth/password/login`,
     submissions: (assignmentId) => `${api}/student/assignments/${encodeURIComponent(assignmentId)}/submissions`,
+    // DELETE deletes the latest round of the node given as ?nodeId= (none for node-less work).
+    withdraw: (assignmentId, nodeId) => `${api}/student/assignments/${encodeURIComponent(assignmentId)}/submissions${
+      nodeId == null ? '' : `?nodeId=${encodeURIComponent(nodeId)}`}`,
   };
 }
 
@@ -102,6 +105,8 @@ export function makeApi(target, { fetchImpl = (...a) => fetch(...a), uploadRetry
       request('POST', paths.submissions(assignmentId), { nodeId: nodeId ?? null, fileUrl }),
     updateSubmission: (assignmentId, nodeId, fileUrl) =>
       request('PUT', paths.submissions(assignmentId), { nodeId: nodeId ?? null, fileUrl }),
-    // Deliberately no withdraw: the extension never deletes submissions.
+    // Deletes the node's latest round. Only ever called from withdraw.js, after the user
+    // confirmed that exact round (requirements R6).
+    withdrawSubmission: (assignmentId, nodeId) => request('DELETE', paths.withdraw(assignmentId, nodeId)),
   };
 }

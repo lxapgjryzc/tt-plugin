@@ -66,6 +66,7 @@ const ITEM_STATUS = {
   failed: ['stFailed', 'accent'],
   continued: ['stContinued', 'faint'],
   skipped: ['stSkipped', 'faint'],
+  withdrawn: ['stWithdrawn', 'faint'],
 };
 export function itemStatusText(status) {
   return t((ITEM_STATUS[status] || [status])[0]);

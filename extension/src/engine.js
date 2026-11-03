@@ -23,6 +23,7 @@ export function summarize(target, term, decision, error = null) {
         nodeId: submission.nodeId === null ? null : String(submission.nodeId),
         label: label(assignment, findNode(assignment, submission.nodeId)),
         status: submission.status,
+        submissionId: String(submission.submissionId),
         queuePosition: submission.queuePosition ?? null,
         estimatedWaitMinutes: submission.estimatedWaitMinutes ?? null,
       }))
@@ -225,7 +226,7 @@ async function tickLocked(deps, settings, { manual, owner }) {
   return { why: 'submitted', method, itemId: item.id };
 }
 
-async function applyReconcile(deps, term) {
+export async function applyReconcile(deps, term) {
   const backlog = await deps.store.listBacklog();
   const byId = new Map(backlog.map((i) => [i.id, i]));
   for (const { id, patch } of reconcile({ target: deps.target, term, backlog })) {

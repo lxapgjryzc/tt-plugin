@@ -80,6 +80,7 @@ export function fakeServer(term) {
   const calls = { upload: 0, post: 0, put: 0, weeks: 0 };
   let uploadFailures = []; // queue of statuses to fail with
   let submitHook = null;
+  let withdrawHook = null;
   const clone = () => structuredClone(term);
   const api = {
     calls,
@@ -115,6 +116,18 @@ export function fakeServer(term) {
   };
   api.createSubmission = submit('post');
   api.updateSubmission = submit('put');
+  // Like the platform: deletes the node's latest round, only while it is SUBMITTED.
+  api.withdrawSubmission = async (assignmentId, nodeId) => {
+    calls.delete = (calls.delete || 0) + 1;
+    const a = term.weeks[0].lessons[0].assignments.find((x) => x.assignmentId === assignmentId);
+    const subs = a.submissions.filter((s) => s.nodeId === nodeId);
+    const last = subs[subs.length - 1];
+    if (!last || last.status !== 'SUBMITTED') throw new ApiError(200, 400, '当前状态不可撤回');
+    a.submissions.splice(a.submissions.indexOf(last), 1);
+    a.nodes.find((x) => x.nodeId === nodeId).status = subs.length > 1 ? subs[subs.length - 2].status : null;
+    if (withdrawHook) await withdrawHook();
+  };
+  api.onWithdraw = (fn) => { withdrawHook = fn; };
   return api;
 }
 
@@ -134,6 +147,20 @@ export function fakeDeps(api, backlog, settingsOver = {}) {
     store: {
       listBacklog: async () => [...items.values()].map((i) => ({ ...i })),
       getImage: async (id) => ({ id, blob: new Blob(['png'], { type: 'image/png' }), name: `${id}.png` }),
+      requeueWithImages: async (id, imageIds, roundsAtQueue, expect) => {
+        const cur = items.get(id);
+        if (!cur || ![].concat(expect).includes(cur.status)) return null;
+        const next = { ...cur, imageIds, status: 'queued', reason: null, objectNames: [], submissionId: null, roundsBefore: null, serverStatus: null, roundsAtQueue };
+        items.set(id, next);
+        return next;
+      },
+      addItemWithImages: async ({ imageIds, ...fields }) => {
+        const queued = [...items.values()].filter((i) => i.assignmentId === fields.assignmentId && i.nodeId === fields.nodeId && i.status === 'queued');
+        const order = queued.length ? Math.min(...queued.map((i) => i.order)) - 0.5 : items.size + 100;
+        const it = { id: `added-${items.size}`, imageIds, status: 'queued', reason: null, objectNames: [], submissionId: null, roundsBefore: null, attempts: 0, nextAttemptAt: null, order, createdAt: new Date(order).toISOString(), ...fields };
+        items.set(it.id, it);
+        return it;
+      },
       patchItem: async (id, patch, expect) => {
         const cur = items.get(id);
         if (!cur || (expect !== undefined && ![].concat(expect).includes(cur.status))) return null;

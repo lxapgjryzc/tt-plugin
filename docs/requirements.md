@@ -300,7 +300,121 @@ took about 300 ms while the page's own script took 0 ms (measured on 2026-11-03)
 
 ---
 
+## R9. Background app instead of the extension
+
+### Background
+
+Everything ran in the extension's service worker, so Chrome had to stay open (with a window)
+for queued drawings to go out. The user wants to close the browser while a batch waits for
+review slots. The scheduling core (`engine`, `scheduler`, `reconcile`, `withdraw`, `adapter`,
+`model`, …) never touched `chrome.*` and already runs in Node tests; only storage, the alarm,
+the token bridge, the CORS workaround, notifications and the queue page's plumbing are tied
+to Chrome.
+
+Decided with the user on 2026-11-03: a Node background app with a local web page, login by
+saved password, the extension kept as an optional thin shell that also restores the site's
+login, and no migration of the old extension's queue.
+
+### Requirements
+
+**The app**
+
+- **R9.1** `app/` is a Node 24 program with no dependencies (`npm start`). It does every check
+  and submission the extension did, with the same rules (README *Never submitting twice*,
+  R1–R8). It needs no browser to run.
+- **R9.2 Storage.** Queue items, images (originals and thumbnails), settings, the last term
+  summary and the activity log live in one SQLite file (`node:sqlite`) under
+  `%LOCALAPPDATA%\Chamber\` (`CHAMBER_HOME` overrides it). Every write is a transaction, so a
+  crash or power loss leaves either the old or the new state, never half of one.
+- **R9.3 One instance.** The app listens on `127.0.0.1:47815` (`CHAMBER_PORT` overrides it).
+  A second start finds the port taken, says so and exits without touching the data. Within
+  the process one check runs at a time (the same lock interface as before, held in memory).
+- **R9.4 Restarts.** Killing the app at any point is the same as the old service-worker
+  eviction: an item left in *Uploading* or *Submitting* is resolved from platform data on
+  the next check and is never sent blindly again.
+- **R9.5 Timing.** Periodic checks run every `tickSeconds` (default 60, minimum 30) with the
+  review-hours pause, and right after start. After the computer wakes from sleep the next
+  check runs at once (a timer that fired late by more than one period counts as a wake-up).
+  Nothing runs while the computer sleeps.
+- **R9.6 Autostart.** `npm run autostart:on` registers a Windows scheduled task that starts
+  the app at the user's logon with no console window and restarts it if it crashes;
+  `npm run autostart:off` removes it. The queue page has **Quit app**; quitting is not a
+  crash and is not restarted until the next logon.
+- **R9.7 No CORS workaround.** The app's requests carry no `Origin` header, so the
+  declarativeNetRequest rule is gone.
+
+**Login**
+
+- **R9.8** Automatic login works as before (password login when the session is missing,
+  expired or within an hour of expiry; a refused password stops it and notifies, network
+  errors retry at most every 10 minutes), with the queue page's **Automatic login** section.
+- **R9.9** The password is encrypted with Windows DPAPI for the current user before it is
+  stored, so the database file alone does not reveal it. If encryption is unavailable the
+  password is not saved and the page says why; there is no plain-text fallback. It is never
+  logged, never returned by the API, and only sent to `tenten.art/api/auth/password/login`.
+- **R9.10** Without automatic login the app uses a token handed over by the extension (R9.18).
+  The 24 h reminders work as before, as Windows notifications.
+
+**Queue page and local API**
+
+- **R9.11** The app serves the queue page at `http://127.0.0.1:47815/`. It looks and behaves
+  as before; every read and write goes through the app's API (the page holds no data of its
+  own besides per-browser conveniences such as the picker filter, R7.4). Closing the page
+  never affects checks. Several open pages stay in sync (server-sent events).
+- **R9.12 Local API safety.** The API only answers requests whose `Host` is
+  `127.0.0.1:<port>` or `localhost:<port>` (defeats DNS rebinding) and that carry the app's
+  secret key in a header (forces a CORS preflight, which is refused, so other web pages can
+  neither read nor blindly post). The key is random, made on first start and kept in the data
+  folder; the page served by the app embeds it. `Access-Control-Allow-*` headers are never
+  sent.
+- **R9.13 Thumbnails** (R8) are made by the page, which can decode images, and stored by the
+  app. Images queued from the site get theirs the first time a page shows them (R8.2).
+- **R9.14 Language.** *Auto* follows the browser showing the page; notifications follow the
+  Windows display language.
+- **R9.15 Notifications** (approved, revision, not sent, login expiring / expired / automatic
+  login failed) are Windows toast notifications; clicking one opens the queue page in the
+  default browser. If a toast cannot be shown the event is still in the activity log.
+
+**The extension (optional thin shell)**
+
+- **R9.16** The extension keeps only what needs the site page: the timezone fix, the
+  **加入 Chamber 队列** buttons, the floating badge, and the session hand-over (R9.18). It
+  has no queue, no storage of drawings and never calls the platform API. Without it the app
+  still works fully (images are then queued on the queue page).
+- **R9.17 Pairing.** The extension finds the app at `127.0.0.1:47815` and learns the key by
+  reading it from the app's own page (a content script on that origin), so opening the queue
+  page once in Chrome pairs them. Until paired, or while the app is not running, the site
+  buttons say the app is not reachable and queue nothing; nothing is kept for later.
+- **R9.18 Session hand-over.** On tenten.art the extension sends the page's token to the app
+  (the app keeps whichever token lasts longer, as before); if the page has no usable session
+  and automatic login is on, it asks the app for the session it logged in with and restores
+  the site's own login with it, as before.
+- **R9.19** The toolbar icon opens the queue page; its badge shows the app's state (slots,
+  attention count, `||`, `!`), or a grey `off` when the app is not reachable.
+- **R9.20 No migration.** Updating the extension deletes its old queue, images, settings
+  and saved password from Chrome. Nothing is carried over; the README tells the user to
+  switch over while no item is *Uploading* or *Submitting*. Rounds already submitted by the
+  old extension show up in the app under *In review* as rounds submitted elsewhere (R5).
+
+### Scenarios that tests must cover
+
+1. The engine tests pass unchanged against the SQLite store (same store contract).
+2. Store: enqueue, follow-up order, replace, compare-and-set patch, remove refused while
+   in flight, reorder, staged images; all survive closing and reopening the database.
+3. Crash between upload and submit, and after submit before the response: on restart the
+   item is resolved from the platform (submitted once, or back to the queue), never sent twice.
+4. A second app instance exits and leaves the data untouched.
+5. API: wrong `Host` → refused; missing or wrong key → refused; an `OPTIONS` preflight gets
+   no CORS headers; the password never appears in any response or the activity log.
+6. Token hand-over keeps the longer-lasting token; site session is only given out while
+   automatic login is on.
+7. Wake-up: a timer firing two periods late triggers an immediate check.
+
+---
+
 ## Out of scope
 
 - Withdrawing or replacing a 完整作业 (R3.2).
 - Grouping the node picker by chapter.
+- Waking the computer from sleep to submit (R9.5).
+- macOS / Linux autostart (the app itself is plain Node; only R9.6, R9.9 and R9.15 use Windows).

@@ -67,6 +67,13 @@ li.row[draggable="true"]:focus-visible { outline-offset: -2px; }
 
 .picker-head { display: flex; gap: var(--u); align-items: center; margin-top: calc(var(--u) * 2); }
 .picker-head input[type="search"] { flex: 1; min-width: 0; }
+.filters { margin-top: var(--u); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.filter-row { display: flex; gap: var(--u); align-items: baseline; }
+.filter-row > span { flex: none; width: 3.5em; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+button.chip { min-height: 26px; padding: 2px 8px; border-radius: 13px; font-size: 12px; display: inline-flex; gap: 4px; align-items: center; color: var(--muted); }
+button.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip-count { font-variant-numeric: tabular-nums; opacity: 0.7; }
 .picker { margin-top: var(--u); border-top: 1px solid var(--line); max-height: 420px; overflow: auto; }
 .group { padding: var(--u) 0; border-bottom: 1px solid var(--line); }
 .group-head { display: flex; gap: var(--u); align-items: baseline; justify-content: space-between; padding: 0 0 4px; }

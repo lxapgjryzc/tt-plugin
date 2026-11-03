@@ -315,8 +315,32 @@
   "searchNodes": {
     "message": "搜索作业和节点"
   },
-  "showAll": {
-    "message": "显示全部"
+  "filterStatus": {
+    "message": "状态"
+  },
+  "filterType": {
+    "message": "类型"
+  },
+  "filterReset": {
+    "message": "重置筛选"
+  },
+  "filterCanQueue": {
+    "message": "可加入"
+  },
+  "filterQueued": {
+    "message": "已排队"
+  },
+  "filterInReview": {
+    "message": "批改中"
+  },
+  "filterReturned": {
+    "message": "已退回"
+  },
+  "filterApproved": {
+    "message": "已通过"
+  },
+  "filterUnavailable": {
+    "message": "不可提交"
   },
   "pickNode": {
     "message": "目标节点"

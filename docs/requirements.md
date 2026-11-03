@@ -240,6 +240,39 @@ it must be at least as guarded as submitting.
 
 ---
 
+## R7. Node picker filters
+
+### Background
+
+The node picker on the queue page had one switch, *Show all*: off hid approved nodes and
+assignments where nothing could be queued; on showed everything. With follow-ups (R2) and
+returned nodes, more node states matter, and finding e.g. "everything returned" or "only
+graduation work" took scrolling.
+
+### Requirements
+
+- **R7.1 Status filter.** Every node falls into exactly one state, checked in this order:
+  1. *Approved*: latest round approved.
+  2. *In review*: latest round SUBMITTED or REVIEWING (can take a follow-up).
+  3. *Returned*: latest round REVIEWED / RETURNED / SHELVED.
+  4. *Queued*: not submitted yet, but has items of ours waiting.
+  5. *Can queue*: not submitted yet and can be queued now (including after the previous node).
+  6. *Unavailable*: cannot be queued (locked with nothing before it queued or in review,
+     closed, past deadline, prerequisite missing, term inactive).
+  Each state is a toggle chip showing how many nodes are in it (after the type filter and
+  search). Default: everything except *Approved* and *Unavailable*, which matches the old
+  default view.
+- **R7.2 Type filter.** One toggle chip per assignment type present in the term (basic,
+  advanced, bi-weekly, graduation, …), all on by default.
+- **R7.3** Search still applies on top. An assignment is shown when at least one of its
+  nodes passes all filters; only those nodes are listed. *Reset* restores the defaults.
+- **R7.4** The choice is remembered in this browser (convenience only; losing it just
+  restores the defaults).
+- **R7.5** Opening the queue page for an assignment from the site shows that assignment
+  even if the remembered filter would hide it, without changing the remembered filter.
+
+---
+
 ## Out of scope
 
 - Withdrawing or replacing a 完整作业 (R3.2).

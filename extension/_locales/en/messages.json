@@ -315,8 +315,32 @@
   "searchNodes": {
     "message": "Search assignments and nodes"
   },
-  "showAll": {
-    "message": "Show all"
+  "filterStatus": {
+    "message": "Status"
+  },
+  "filterType": {
+    "message": "Type"
+  },
+  "filterReset": {
+    "message": "Reset filters"
+  },
+  "filterCanQueue": {
+    "message": "Can queue"
+  },
+  "filterQueued": {
+    "message": "Queued"
+  },
+  "filterInReview": {
+    "message": "In review"
+  },
+  "filterReturned": {
+    "message": "Returned"
+  },
+  "filterApproved": {
+    "message": "Approved"
+  },
+  "filterUnavailable": {
+    "message": "Unavailable"
   },
   "pickNode": {
     "message": "Target node"

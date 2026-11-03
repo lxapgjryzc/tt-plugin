@@ -9,6 +9,7 @@ import {
 } from '../src/model.js';
 import { prioritize, priorityOf, canQueue } from '../src/scheduler.js';
 import { imageProblem, imageSetProblem } from '../src/images.js';
+import { NODE_STATES, nodeState, defaultFilter, normalizeFilter, typeOf } from '../src/picker.js';
 import { parseReviewHours } from '../src/review-hours.js';
 
 const $ = (id) => document.getElementById(id);
@@ -25,6 +26,8 @@ const state = {
   selected: null, // { assignmentId, nodeId }
   thumbs: new Map(), // imageId -> object URL
   replaceId: null,
+  filter: null, // picker filter (R7), loaded in wire()
+  focusAssignment: null, // assignment shown regardless of the filter (opened from the site)
 };
 
 // ---------------------------------------------------------------------------
@@ -469,6 +472,47 @@ function matches(q, ...texts) {
   return texts.some((s) => s && String(s).toLowerCase().includes(q));
 }
 
+// ---- filters (requirements R7) ----
+// Remembered per browser as a convenience; any failure just means the defaults.
+const FILTER_KEY = 'chamber.pickerFilter';
+const STATE_KEYS = {
+  canQueue: 'filterCanQueue', queued: 'filterQueued', inReview: 'filterInReview',
+  returned: 'filterReturned', approved: 'filterApproved', unavailable: 'filterUnavailable',
+};
+
+function loadFilter() {
+  try { return normalizeFilter(JSON.parse(localStorage.getItem(FILTER_KEY) || 'null')); } catch { return defaultFilter(); }
+}
+
+function saveFilter() {
+  try { localStorage.setItem(FILTER_KEY, JSON.stringify(state.filter)); } catch { /* not remembered */ }
+}
+
+// A user change to the filter: remember it and drop the one-off view from a site link.
+function changeFilter(fn) {
+  fn(state.filter);
+  state.focusAssignment = null;
+  saveFilter();
+  renderPicker();
+}
+
+const toggle = (list, value) => (list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
+
+function chip(text, count, pressed, onclick) {
+  return el('button', { type: 'button', class: 'chip', 'aria-pressed': String(pressed), onclick },
+    text, count == null ? null : el('span', { class: 'chip-count', text: String(count) }));
+}
+
+function renderFilters(stateCounts, typeCounts, types) {
+  const { states, hiddenTypes } = state.filter;
+  $('filterStateChips').replaceChildren(...NODE_STATES.map((s) => chip(t(STATE_KEYS[s]), stateCounts[s] || 0, states.includes(s),
+    () => changeFilter((f) => { f.states = toggle(f.states, s); }))));
+  $('filterTypeChips').replaceChildren(...types.map((type) => chip(t(TYPE_KEYS[type] || 'typeOther'), typeCounts[type] || 0, !hiddenTypes.includes(type),
+    () => changeFilter((f) => { f.hiddenTypes = toggle(f.hiddenTypes, type); }))));
+  const isDefault = JSON.stringify(state.filter) === JSON.stringify(defaultFilter());
+  $('resetFilter').hidden = isDefault && !state.focusAssignment;
+}
+
 function renderPicker() {
   const box = $('picker');
   if (!state.term) {
@@ -476,44 +520,56 @@ function renderPicker() {
     return;
   }
   const q = $('search').value.trim().toLowerCase();
-  const showAll = $('showAll').checked;
-  const groups = [];
+  const shownStates = new Set(state.filter.states);
+  const hiddenTypes = new Set(state.filter.hiddenTypes);
 
+  // Every node that matches the search, with its state.
+  const entries = [];
+  const types = [];
   for (const { lesson, assignment: a } of listAssignments(state.term)) {
-    const nodes = (a.nodes || []).length ? a.nodes : [null];
-    const rows = [];
-    let anySelectable = false;
-    for (const n of nodes) {
-      const status = nodeStatus(a, n);
-      if (!showAll && status === target.doneStatus) continue;
+    if (!types.includes(typeOf(a))) types.push(typeOf(a));
+    for (const n of (a.nodes || []).length ? a.nodes : [null]) {
       if (!matches(q, a.title, n?.title, lesson?.title, lesson?.groupTitle)) continue;
-      const ps = pickState(a, n);
-      if (ps.ok) anySelectable = true;
-      const nodeId = n ? String(n.nodeId) : null;
-      const sel = state.selected?.assignmentId === String(a.assignmentId) && state.selected?.nodeId === nodeId;
-      const hint = ps.ok ? [ps.chained ? t('chainedHint') : '', ps.followUp ? t('followUpHint') : ''].filter(Boolean).join(' ') : reasonText(ps.reason, ps.detail);
-      const input = el('input', {
-        type: 'radio', name: 'node', value: `${a.assignmentId}|${nodeId ?? ''}`, disabled: !ps.ok, checked: sel,
-        onchange: () => { state.selected = { assignmentId: String(a.assignmentId), nodeId }; showAddError(''); updateAddButton(); markSelected(); },
-      });
-      rows.push(el('label', { class: `node${ps.ok ? '' : ' disabled'}${sel ? ' selected' : ''}`, title: hint || null, 'data-key': `${a.assignmentId}|${nodeId ?? ''}` },
-        input,
-        el('span', { class: 'node-title', text: n ? n.title || `#${n.nodeOrder}` : t('wholeAssignment') }),
-        ps.followUp ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('followUp') })
-          : ps.chained ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('chained') }) : nodeTag(status, n?.locked)));
+      entries.push({ a, n, ...nodeState(target, state.term, state.backlog, a, n) });
     }
-    // By default, hide assignments where nothing can be queued right now (closed,
-    // prerequisite missing, every open node locked or already queued), like approved nodes.
-    if (!rows.length || (!showAll && !anySelectable)) continue;
+  }
+  const typeShown = (e) => !hiddenTypes.has(typeOf(e.a));
+  const stateShown = (e) => shownStates.has(e.state);
+  // Opened from the site for one assignment: show all of it, whatever the filter (R7.5).
+  const forced = (e) => state.focusAssignment === String(e.a.assignmentId);
+  const countBy = (list, key) => list.reduce((m, e) => ({ ...m, [key(e)]: (m[key(e)] || 0) + 1 }), {});
+  renderFilters(countBy(entries.filter(typeShown), (e) => e.state), countBy(entries.filter(stateShown), (e) => typeOf(e.a)), types);
+
+  const groups = new Map(); // assignmentId -> { a, rows }
+  for (const e of entries) {
+    if (!forced(e) && !(typeShown(e) && stateShown(e))) continue;
+    const { a, n, verdict: ps, status } = e;
+    const key = String(a.assignmentId);
+    if (!groups.has(key)) groups.set(key, { a, rows: [] });
+    const nodeId = n ? String(n.nodeId) : null;
+    const sel = state.selected?.assignmentId === key && state.selected?.nodeId === nodeId;
+    const hint = ps.ok ? [ps.chained ? t('chainedHint') : '', ps.followUp ? t('followUpHint') : ''].filter(Boolean).join(' ') : reasonText(ps.reason, ps.detail);
+    const input = el('input', {
+      type: 'radio', name: 'node', value: `${key}|${nodeId ?? ''}`, disabled: !ps.ok, checked: sel,
+      onchange: () => { state.selected = { assignmentId: key, nodeId }; showAddError(''); updateAddButton(); markSelected(); },
+    });
+    groups.get(key).rows.push(el('label', { class: `node${ps.ok ? '' : ' disabled'}${sel ? ' selected' : ''}`, title: hint || null, 'data-key': `${key}|${nodeId ?? ''}` },
+      input,
+      el('span', { class: 'node-title', text: n ? n.title || `#${n.nodeOrder}` : t('wholeAssignment') }),
+      ps.followUp ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('followUp') })
+        : ps.chained ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('chained') }) : nodeTag(status, n?.locked)));
+  }
+
+  const out = [...groups.values()].map(({ a, rows }) => {
     const note = a.blockedReason ? String(a.blockedReason) : a.status === 'CLOSED' ? t('reasonClosed') : null;
-    groups.push(el('div', { class: 'group' },
+    return el('div', { class: 'group' },
       el('div', { class: 'group-head' },
         el('span', { class: 'group-title', text: a.title }),
         el('span', { class: 'tag', text: t(TYPE_KEYS[a.assignmentType] || 'typeOther') })),
       note ? el('div', { class: 'group-note', text: note }) : null,
-      rows));
-  }
-  box.replaceChildren(...(groups.length ? groups : [el('div', { class: 'muted none', text: t('noMatches') })]));
+      rows);
+  });
+  box.replaceChildren(...(out.length ? out : [el('div', { class: 'muted none', text: t('noMatches') })]));
 }
 
 function markSelected() {
@@ -591,8 +647,8 @@ function applyPrefill() {
   const n = q.get('n');
   const node = n ? findNode(assignment, n) : (assignment.nodes || []).find((x) => pickState(assignment, x).ok);
   if (node && pickState(assignment, node).ok) state.selected = { assignmentId: String(assignment.assignmentId), nodeId: String(node.nodeId) };
-  // Opened from an assignment where nothing can be queued: show it anyway, with the reasons.
-  else $('showAll').checked = true;
+  // Show this assignment whatever the remembered filter says (R7.5).
+  state.focusAssignment = String(assignment.assignmentId);
   renderPicker();
   document.querySelector('.node.selected')?.scrollIntoView({ block: 'nearest' });
   history.replaceState(null, '', location.pathname);
@@ -639,6 +695,7 @@ async function loadLogin() {
 }
 
 function wire() {
+  state.filter = loadFilter();
   $('loginForm').addEventListener('input', () => { loginDirty = true; });
   $('loginForm').addEventListener('change', () => { loginDirty = true; });
   $('loginForm').addEventListener('submit', async (e) => {
@@ -734,7 +791,7 @@ function wire() {
   $('wdCancel').addEventListener('click', () => $('withdrawDialog').close());
 
   $('search').addEventListener('input', renderPicker);
-  $('showAll').addEventListener('change', renderPicker);
+  $('resetFilter').addEventListener('click', () => changeFilter((f) => Object.assign(f, defaultFilter())));
   $('addBtn').addEventListener('click', addItem);
   $('auditList').closest('details').addEventListener('toggle', (e) => { if (e.target.open) renderAudit(); });
   window.addEventListener('focus', () => refresh({ tree: true }));

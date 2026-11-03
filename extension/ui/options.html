@@ -117,7 +117,17 @@
 
         <div class="picker-head">
           <input id="search" type="search" data-i18n-placeholder="searchNodes" data-i18n-aria="searchNodes">
-          <label class="switch"><input id="showAll" type="checkbox"><span data-i18n="showAll"></span></label>
+        </div>
+        <div class="filters">
+          <div class="filter-row">
+            <span class="muted small" data-i18n="filterStatus"></span>
+            <div id="filterStateChips" class="chips" role="group" data-i18n-aria="filterStatus"></div>
+          </div>
+          <div class="filter-row">
+            <span class="muted small" data-i18n="filterType"></span>
+            <div id="filterTypeChips" class="chips" role="group" data-i18n-aria="filterType"></div>
+          </div>
+          <button id="resetFilter" type="button" class="link small" data-i18n="filterReset" hidden></button>
         </div>
         <div id="picker" class="picker" role="radiogroup" data-i18n-aria="pickNode"></div>
 

@@ -102,6 +102,7 @@ extension/            the folder Chrome loads (runtime files only)
     model.js          pure helpers over the assignment tree
     images.js         image rules (types, size, count)
     picker.js         node picker states and filter defaults
+    thumbs.js         small thumbnails; pages never draw original images (they can be ~100 MP)
     scheduler.js      pure: what to do this check, priority order, queue eligibility
     reconcile.js      pure: correct the local queue from platform data
     engine.js         one full check, all side effects injected (testable in Node)

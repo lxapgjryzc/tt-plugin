@@ -75,6 +75,16 @@ export async function getImage(id) {
   return reqP(db.transaction('images').objectStore('images').get(id));
 }
 
+// Store the thumbnail made for an image (requirements R8), so it is made only once.
+export async function setThumb(id, thumb) {
+  const db = await open();
+  const tx = db.transaction('images', 'readwrite');
+  const store = tx.objectStore('images');
+  const cur = await reqP(store.get(id));
+  if (cur) store.put({ ...cur, thumb });
+  await done(tx);
+}
+
 function putImages(tx, images, now) {
   const store = tx.objectStore('images');
   return images.map(({ blob, name }) => {

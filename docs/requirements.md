@@ -277,6 +277,29 @@ graduation work" took scrolling.
 
 ---
 
+## R8. Thumbnails
+
+### Background
+
+The queue page showed the original images scaled down by CSS. Drawings can be huge (one
+queued image measured 12721 × 8000, about 400 MB decoded), more than the browser's decoded
+image cache keeps, so every repaint decoded and resampled it again: each frame after a click
+took about 300 ms while the page's own script took 0 ms (measured on 2026-11-03).
+
+### Requirements
+
+- **R8.1** Extension pages never display an original image. They show a thumbnail at most
+  240 px wide, made once per image and stored with it, so it is never made again.
+- **R8.2** Images queued from the site or stored before this change get their thumbnail the
+  first time the queue page shows them.
+- **R8.3** Images just chosen (the add area, *Replace images*, *Withdraw and replace*) are
+  previewed through the same thumbnails.
+- **R8.4** Uploads always send the original file, unchanged.
+- **R8.5** If a thumbnail cannot be made (e.g. a format the browser cannot decode), a
+  placeholder icon is shown; nothing else is affected.
+
+---
+
 ## Out of scope
 
 - Withdrawing or replacing a 完整作业 (R3.2).

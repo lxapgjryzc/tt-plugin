@@ -9,6 +9,7 @@ import {
 } from '../src/model.js';
 import { prioritize, priorityOf, canQueue } from '../src/scheduler.js';
 import { imageProblem, imageSetProblem } from '../src/images.js';
+import { makeThumb } from '../src/thumbs.js';
 import { NODE_STATES, nodeState, defaultFilter, normalizeFilter, typeOf } from '../src/picker.js';
 import { parseReviewHours } from '../src/review-hours.js';
 
@@ -24,7 +25,7 @@ const state = {
   snap: null,
   images: [], // [{ blob, name, url }] in submission order, at most target.maxImagesPerSubmission
   selected: null, // { assignmentId, nodeId }
-  thumbs: new Map(), // imageId -> object URL
+  thumbs: new Map(), // imageId -> Promise of a thumbnail object URL (or null)
   replaceId: null,
   filter: null, // picker filter (R7), loaded in wire()
   focusAssignment: null, // assignment shown regardless of the filter (opened from the site)
@@ -97,34 +98,55 @@ function renderHeader() {
 // ---------------------------------------------------------------------------
 // Backlog
 
+// Thumbnails only, never the original (requirements R8). The stored thumbnail is used if
+// there is one; otherwise it is made from the original once and stored.
+function storedThumbUrl(imageId) {
+  if (!state.thumbs.has(imageId)) {
+    state.thumbs.set(imageId, (async () => {
+      const rec = await store.getImage(imageId);
+      let thumb = rec?.thumb;
+      if (!thumb && rec?.blob) {
+        try {
+          thumb = await makeThumb(rec.blob);
+          await store.setThumb(imageId, thumb);
+        } catch {
+          return null; // not decodable: placeholder (R8.5)
+        }
+      }
+      return thumb ? URL.createObjectURL(thumb) : null;
+    })());
+  }
+  return state.thumbs.get(imageId);
+}
+
+// An <img> that shows the placeholder until `urlPromise` resolves.
+function thumbImg(urlPromise, cls, alt = '') {
+  const ph = el('div', { class: `${cls} ph` }, icon('image'));
+  urlPromise.then((url) => { if (url) ph.replaceWith(el('img', { class: cls, src: url, alt })); });
+  return ph;
+}
+
 // The first image of the item's set, with a count when there are more.
 function thumbFor(item) {
   const first = item.imageIds?.[0];
   const count = item.imageIds?.length || 0;
-  const wrap = el('div', { class: 'thumb-wrap' },
+  return el('div', { class: 'thumb-wrap' },
+    first ? thumbImg(storedThumbUrl(first), 'thumb') : el('div', { class: 'thumb ph' }, icon('image')),
     count > 1 ? el('span', { class: 'thumb-count', 'aria-label': t('imageCount', [String(count)]), text: `+${count - 1}` }) : null);
-  const url = state.thumbs.get(first);
-  if (url) {
-    wrap.prepend(el('img', { class: 'thumb', src: url, alt: '' }));
-    return wrap;
-  }
-  const ph = el('div', { class: 'thumb ph' }, icon('image'));
-  wrap.prepend(ph);
-  if (first) {
-    store.getImage(first).then((img) => {
-      if (!img?.blob) return;
-      const u = URL.createObjectURL(img.blob);
-      state.thumbs.set(first, u);
-      ph.replaceWith(el('img', { class: 'thumb', src: u, alt: '' }));
-    });
-  }
-  return wrap;
 }
 
 function gcThumbs() {
   const live = new Set(state.backlog.map((i) => i.imageIds?.[0]));
-  for (const [id, url] of state.thumbs) if (!live.has(id)) { URL.revokeObjectURL(url); state.thumbs.delete(id); }
+  for (const [id, p] of state.thumbs) {
+    if (live.has(id)) continue;
+    state.thumbs.delete(id);
+    p.then((url) => url && URL.revokeObjectURL(url));
+  }
 }
+
+// Thumbnail of a file just chosen (not stored yet): a Promise of an object URL or null.
+const fileThumbUrl = (file) => makeThumb(file).then((thumb) => URL.createObjectURL(thumb), () => null);
+const revoke = (p) => p?.then((url) => url && URL.revokeObjectURL(url));
 
 async function itemsChanged() {
   await send('chamber:itemsChanged');
@@ -354,6 +376,7 @@ const FINISHED = new Set(['done', 'continued', 'skipped', 'withdrawn']);
 // round in a dialog; the service worker re-checks it before deleting.
 
 let withdrawing = null; // { round, files }
+let withdrawPreviewUrls = []; // thumbnails shown in the dialog
 
 function pickWithdrawReplacement(round) {
   withdrawing = { round, files: null };
@@ -368,9 +391,10 @@ function askWithdraw(round, files) {
   $('wdQueue').textContent = round.queuePosition ? t('withdrawQueueLoss', [String(round.queuePosition)]) : t('withdrawQueueLossNoPos');
   $('wdNext').textContent = files ? t('withdrawReplaceNote') : round.behind ? t('withdrawFollowUps', [String(round.behind)]) : '';
   $('wdNext').hidden = !$('wdNext').textContent;
-  for (const img of $('wdPreviews').querySelectorAll('img')) URL.revokeObjectURL(img.src);
-  $('wdPreviews').replaceChildren(...(files || []).map((f, i) => el('div', { class: 'preview' },
-    el('img', { src: URL.createObjectURL(f), alt: t('imageN', [String(i + 1)]) }))));
+  for (const url of withdrawPreviewUrls) revoke(url);
+  withdrawPreviewUrls = (files || []).map(fileThumbUrl);
+  $('wdPreviews').replaceChildren(...withdrawPreviewUrls.map((url, i) => el('div', { class: 'preview' },
+    thumbImg(url, 'preview-img', t('imageN', [String(i + 1)])))));
   $('wdPreviews').hidden = !files;
   $('wdError').textContent = '';
   $('wdConfirm').hidden = false;
@@ -430,19 +454,19 @@ function addImages(files) {
     showAddError(t('errTooManyImages'));
     return;
   }
-  for (const f of files) state.images.push({ blob: f, name: fileName(f), url: URL.createObjectURL(f) });
+  for (const f of files) state.images.push({ blob: f, name: fileName(f), url: fileThumbUrl(f) });
   showAddError('');
   renderImages();
 }
 
 function removeImage(index) {
   const [gone] = state.images.splice(index, 1);
-  if (gone) URL.revokeObjectURL(gone.url);
+  revoke(gone?.url);
   renderImages();
 }
 
 function clearImages() {
-  for (const img of state.images) URL.revokeObjectURL(img.url);
+  for (const img of state.images) revoke(img.url);
   state.images = [];
   renderImages();
 }
@@ -452,7 +476,7 @@ function renderImages() {
   $('previews').hidden = !has;
   $('dropText').hidden = has;
   $('previews').replaceChildren(...state.images.map((img, i) => el('div', { class: 'preview' },
-    el('img', { src: img.url, alt: t('imageN', [String(i + 1)]) }),
+    thumbImg(img.url, 'preview-img', t('imageN', [String(i + 1)])),
     el('button', {
       class: 'icon remove-image', type: 'button', title: t('removeImage'), 'aria-label': t('removeImage'),
       onclick: (e) => { e.stopPropagation(); removeImage(i); },

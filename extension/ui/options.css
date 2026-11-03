@@ -60,7 +60,8 @@ li.row[draggable="true"]:focus-visible { outline-offset: -2px; }
 .drop.over { border-color: var(--fg); background: var(--hover); }
 .previews { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--u); width: 100%; }
 .preview { position: relative; }
-.preview img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); }
+.preview-img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); }
+.preview-img.ph { display: flex; align-items: center; justify-content: center; color: var(--faint); background: var(--hover); }
 .preview .remove-image { position: absolute; top: 4px; right: 4px; min-height: 0; padding: 2px; border-radius: 4px;
   background: var(--bg); border: 1px solid var(--line); color: var(--fg); }
 #fileInfo { min-height: 20px; margin-top: 4px; }

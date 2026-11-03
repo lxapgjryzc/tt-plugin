@@ -270,6 +270,10 @@ graduation work" took scrolling.
   restores the defaults).
 - **R7.5** Opening the queue page for an assignment from the site shows that assignment
   even if the remembered filter would hide it, without changing the remembered filter.
+- **R7.6 Responsive.** Toggling a chip or typing in search never rebuilds the list: rows and
+  chips are built once per data change (a check, a queue change), and filtering only shows
+  or hides them and updates counts. The chip keeps focus and hover, the selected node stays
+  selected, and the list keeps its scroll position across data refreshes.
 
 ---
 

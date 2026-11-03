@@ -467,13 +467,10 @@ const imageFiles = (dt) => [...(dt?.files || [])];
 // ---------------------------------------------------------------------------
 // Add: node picker
 
-function matches(q, ...texts) {
-  if (!q) return true;
-  return texts.some((s) => s && String(s).toLowerCase().includes(q));
-}
-
 // ---- filters (requirements R7) ----
-// Remembered per browser as a convenience; any failure just means the defaults.
+// The list is built once per data change (buildPicker); filters and search only show or
+// hide what is there (applyPickerFilter), so a click never rebuilds anything (R7.6).
+// The filter is remembered per browser as a convenience; any failure means the defaults.
 const FILTER_KEY = 'chamber.pickerFilter';
 const STATE_KEYS = {
   canQueue: 'filterCanQueue', queued: 'filterQueued', inReview: 'filterInReview',
@@ -493,84 +490,120 @@ function changeFilter(fn) {
   fn(state.filter);
   state.focusAssignment = null;
   saveFilter();
-  renderPicker();
+  applyPickerFilter();
 }
 
 const toggle = (list, value) => (list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
 
-function chip(text, count, pressed, onclick) {
-  return el('button', { type: 'button', class: 'chip', 'aria-pressed': String(pressed), onclick },
-    text, count == null ? null : el('span', { class: 'chip-count', text: String(count) }));
+// Built picker: { entries: [{ a, type, state, text, row }], groups: [{ el, entries }], chips }.
+let picker = null;
+
+function chip(text, onclick) {
+  const count = el('span', { class: 'chip-count' });
+  const button = el('button', { type: 'button', class: 'chip', 'aria-pressed': 'false', onclick }, text, count);
+  return { button, count };
 }
 
-function renderFilters(stateCounts, typeCounts, types) {
-  const { states, hiddenTypes } = state.filter;
-  $('filterStateChips').replaceChildren(...NODE_STATES.map((s) => chip(t(STATE_KEYS[s]), stateCounts[s] || 0, states.includes(s),
-    () => changeFilter((f) => { f.states = toggle(f.states, s); }))));
-  $('filterTypeChips').replaceChildren(...types.map((type) => chip(t(TYPE_KEYS[type] || 'typeOther'), typeCounts[type] || 0, !hiddenTypes.includes(type),
-    () => changeFilter((f) => { f.hiddenTypes = toggle(f.hiddenTypes, type); }))));
-  const isDefault = JSON.stringify(state.filter) === JSON.stringify(defaultFilter());
-  $('resetFilter').hidden = isDefault && !state.focusAssignment;
+function nodeRow(a, n, ps, status) {
+  const key = String(a.assignmentId);
+  const nodeId = n ? String(n.nodeId) : null;
+  const sel = state.selected?.assignmentId === key && state.selected?.nodeId === nodeId;
+  const hint = ps.ok ? [ps.chained ? t('chainedHint') : '', ps.followUp ? t('followUpHint') : ''].filter(Boolean).join(' ') : reasonText(ps.reason, ps.detail);
+  const input = el('input', {
+    type: 'radio', name: 'node', value: `${key}|${nodeId ?? ''}`, disabled: !ps.ok, checked: sel,
+    onchange: () => { state.selected = { assignmentId: key, nodeId }; showAddError(''); updateAddButton(); markSelected(); },
+  });
+  return el('label', { class: `node${ps.ok ? '' : ' disabled'}${sel ? ' selected' : ''}`, title: hint || null, 'data-key': `${key}|${nodeId ?? ''}` },
+    input,
+    el('span', { class: 'node-title', text: n ? n.title || `#${n.nodeOrder}` : t('wholeAssignment') }),
+    ps.followUp ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('followUp') })
+      : ps.chained ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('chained') }) : nodeTag(status, n?.locked));
 }
 
-function renderPicker() {
+// Rebuild rows and chips from the current data. Called on data changes only.
+function buildPicker() {
   const box = $('picker');
   if (!state.term) {
+    picker = null;
     box.replaceChildren(el('div', { class: 'muted none', text: t(state.treeError ? 'pickerUnavailable' : 'loading') }));
     return;
   }
-  const q = $('search').value.trim().toLowerCase();
-  const shownStates = new Set(state.filter.states);
-  const hiddenTypes = new Set(state.filter.hiddenTypes);
-
-  // Every node that matches the search, with its state.
+  const scrollTop = box.scrollTop;
   const entries = [];
+  const groups = [];
   const types = [];
   for (const { lesson, assignment: a } of listAssignments(state.term)) {
-    if (!types.includes(typeOf(a))) types.push(typeOf(a));
+    const type = typeOf(a);
+    if (!types.includes(type)) types.push(type);
+    const group = { entries: [] };
     for (const n of (a.nodes || []).length ? a.nodes : [null]) {
-      if (!matches(q, a.title, n?.title, lesson?.title, lesson?.groupTitle)) continue;
-      entries.push({ a, n, ...nodeState(target, state.term, state.backlog, a, n) });
+      const { state: st, verdict, status } = nodeState(target, state.term, state.backlog, a, n);
+      const text = [a.title, n?.title, lesson?.title, lesson?.groupTitle].filter(Boolean).join('\n').toLowerCase();
+      const entry = { a, type, state: st, text, row: nodeRow(a, n, verdict, status) };
+      entries.push(entry);
+      group.entries.push(entry);
     }
-  }
-  const typeShown = (e) => !hiddenTypes.has(typeOf(e.a));
-  const stateShown = (e) => shownStates.has(e.state);
-  // Opened from the site for one assignment: show all of it, whatever the filter (R7.5).
-  const forced = (e) => state.focusAssignment === String(e.a.assignmentId);
-  const countBy = (list, key) => list.reduce((m, e) => ({ ...m, [key(e)]: (m[key(e)] || 0) + 1 }), {});
-  renderFilters(countBy(entries.filter(typeShown), (e) => e.state), countBy(entries.filter(stateShown), (e) => typeOf(e.a)), types);
-
-  const groups = new Map(); // assignmentId -> { a, rows }
-  for (const e of entries) {
-    if (!forced(e) && !(typeShown(e) && stateShown(e))) continue;
-    const { a, n, verdict: ps, status } = e;
-    const key = String(a.assignmentId);
-    if (!groups.has(key)) groups.set(key, { a, rows: [] });
-    const nodeId = n ? String(n.nodeId) : null;
-    const sel = state.selected?.assignmentId === key && state.selected?.nodeId === nodeId;
-    const hint = ps.ok ? [ps.chained ? t('chainedHint') : '', ps.followUp ? t('followUpHint') : ''].filter(Boolean).join(' ') : reasonText(ps.reason, ps.detail);
-    const input = el('input', {
-      type: 'radio', name: 'node', value: `${key}|${nodeId ?? ''}`, disabled: !ps.ok, checked: sel,
-      onchange: () => { state.selected = { assignmentId: key, nodeId }; showAddError(''); updateAddButton(); markSelected(); },
-    });
-    groups.get(key).rows.push(el('label', { class: `node${ps.ok ? '' : ' disabled'}${sel ? ' selected' : ''}`, title: hint || null, 'data-key': `${key}|${nodeId ?? ''}` },
-      input,
-      el('span', { class: 'node-title', text: n ? n.title || `#${n.nodeOrder}` : t('wholeAssignment') }),
-      ps.followUp ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('followUp') })
-        : ps.chained ? el('span', { class: 'tag', 'data-tone': 'faint', text: t('chained') }) : nodeTag(status, n?.locked)));
-  }
-
-  const out = [...groups.values()].map(({ a, rows }) => {
     const note = a.blockedReason ? String(a.blockedReason) : a.status === 'CLOSED' ? t('reasonClosed') : null;
-    return el('div', { class: 'group' },
+    group.el = el('div', { class: 'group' },
       el('div', { class: 'group-head' },
         el('span', { class: 'group-title', text: a.title }),
         el('span', { class: 'tag', text: t(TYPE_KEYS[a.assignmentType] || 'typeOther') })),
       note ? el('div', { class: 'group-note', text: note }) : null,
-      rows);
-  });
-  box.replaceChildren(...(out.length ? out : [el('div', { class: 'muted none', text: t('noMatches') })]));
+      group.entries.map((e) => e.row));
+    groups.push(group);
+  }
+  const none = el('div', { class: 'muted none', text: t('noMatches') });
+  box.replaceChildren(...groups.map((g) => g.el), none);
+
+  const chips = {
+    states: Object.fromEntries(NODE_STATES.map((s) => [s, chip(t(STATE_KEYS[s]), () => changeFilter((f) => { f.states = toggle(f.states, s); }))])),
+    types: Object.fromEntries(types.map((type) => [type, chip(t(TYPE_KEYS[type] || 'typeOther'), () => changeFilter((f) => { f.hiddenTypes = toggle(f.hiddenTypes, type); }))])),
+  };
+  $('filterStateChips').replaceChildren(...Object.values(chips.states).map((c) => c.button));
+  $('filterTypeChips').replaceChildren(...Object.values(chips.types).map((c) => c.button));
+  picker = { entries, groups, chips, none };
+  applyPickerFilter();
+  box.scrollTop = scrollTop;
 }
+
+// Show or hide rows for the current filter and search; update chips in place.
+function applyPickerFilter() {
+  if (!picker) return;
+  const q = $('search').value.trim().toLowerCase();
+  const shownStates = new Set(state.filter.states);
+  const hiddenTypes = new Set(state.filter.hiddenTypes);
+  const stateCounts = {};
+  const typeCounts = {};
+  for (const e of picker.entries) {
+    const found = !q || e.text.includes(q);
+    const typeOk = !hiddenTypes.has(e.type);
+    const stateOk = shownStates.has(e.state);
+    if (found && typeOk) stateCounts[e.state] = (stateCounts[e.state] || 0) + 1;
+    if (found && stateOk) typeCounts[e.type] = (typeCounts[e.type] || 0) + 1;
+    // Opened from the site for one assignment: show all of it, whatever the filter (R7.5).
+    const forced = state.focusAssignment === String(e.a.assignmentId);
+    e.row.hidden = !(found && (forced || (typeOk && stateOk)));
+  }
+  let any = false;
+  for (const g of picker.groups) {
+    g.el.hidden = g.entries.every((e) => e.row.hidden);
+    any ||= !g.el.hidden;
+  }
+  picker.none.hidden = any;
+
+  for (const [s, c] of Object.entries(picker.chips.states)) {
+    c.button.setAttribute('aria-pressed', String(shownStates.has(s)));
+    c.count.textContent = String(stateCounts[s] || 0);
+  }
+  for (const [type, c] of Object.entries(picker.chips.types)) {
+    c.button.setAttribute('aria-pressed', String(!hiddenTypes.has(type)));
+    c.count.textContent = String(typeCounts[type] || 0);
+  }
+  const isDefault = JSON.stringify(state.filter) === JSON.stringify(defaultFilter());
+  $('resetFilter').hidden = isDefault && !state.focusAssignment;
+}
+
+const renderPicker = buildPicker;
 
 function markSelected() {
   for (const n of document.querySelectorAll('.node.selected')) n.classList.remove('selected');
@@ -790,7 +823,7 @@ function wire() {
   $('wdConfirm').addEventListener('click', confirmWithdraw);
   $('wdCancel').addEventListener('click', () => $('withdrawDialog').close());
 
-  $('search').addEventListener('input', renderPicker);
+  $('search').addEventListener('input', applyPickerFilter);
   $('resetFilter').addEventListener('click', () => changeFilter((f) => Object.assign(f, defaultFilter())));
   $('addBtn').addEventListener('click', addItem);
   $('auditList').closest('details').addEventListener('toggle', (e) => { if (e.target.open) renderAudit(); });

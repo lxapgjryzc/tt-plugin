@@ -8,7 +8,7 @@ The queue page is in English, with Chinese available as an optional language (Qu
 
 You need [Node.js](https://nodejs.org) 24 or later. Nothing else is installed (`npm install` is not needed).
 
-1. **Start the app.** In this folder, run `npm run autostart:on`. This registers a Windows scheduled task that starts Chamber in the background every time you log on (no window; it restarts itself after a crash) and starts it now. `npm run autostart:off` removes it. To run it in a terminal instead, use `npm start`.
+1. **Start the app.** In this folder, run `npm run autostart:on`. This registers Windows scheduled tasks that start Chamber in the background every time you log on (no window; it restarts itself after a crash) and starts it now. A second task checks every 5 minutes and starts Chamber again if it is not running, so it also comes back after being killed (for example by a `taskkill /IM node.exe` that stops every Node program). **Quit app** on the queue page leaves a marker (`quit` in the data folder) that this check respects: after quitting, Chamber stays off until you next log on, run `npm run autostart:on` or `npm start`. `npm run autostart:off` removes both tasks. To run it in a terminal instead, use `npm start`.
 2. **Open the queue page** at http://127.0.0.1:47815/ in any browser. Closing the page or the browser does not stop anything; **Quit Chamber** under Controls does (until you start it again or log on next time).
 3. **Log in.** Turn on **Automatic login** on the queue page (see below), or log in to tenten.art in Chrome with the extension installed, which hands the session over to the app.
 4. **Optional: the extension**, for the queue buttons on the site. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick the `extension/` folder. Then open the queue page once in that Chrome, which connects the two. The toolbar icon opens the queue page; its badge shows the app's state, or a grey **off** when the app is not running.
@@ -105,7 +105,8 @@ Verified against the live API and the site's front-end bundle. Keep this table u
 ```
 app/                  the background app (Node 24, no dependencies)
   main.mjs            entry point: takes the port, opens the data, starts checks
-  service.mjs         supervisor used by autostart: logs to app.log, restarts after a crash
+  service.mjs         supervisor used by autostart: logs to app.log, restarts after a crash; --watchdog: the periodic check
+  launch.mjs          pure: whether a scheduled run starts the app (running? quit on purpose?)
   paths.mjs           data folder and port
   src/
     target.js         site origin, auth key, status constants
@@ -131,7 +132,7 @@ extension/            optional Chrome extension (load unpacked); never calls the
   src/background.js   relays the site page to the app, toolbar badge
   src/content/        on tenten.art: queue buttons, badge, session hand-over, timezone fix; pair.js on the queue page
 test/                 node:test unit tests, incl. a fake platform for crashes, timeouts, 429, rejections
-tools/                generators for strings and icons, autostart
+tools/                generators for strings and icons, autostart (task definitions in autostart-tasks.mjs)
 docs/requirements.md  feature requirements beyond this README (several images, follow-ups, 完整作业, the app)
 ```
 

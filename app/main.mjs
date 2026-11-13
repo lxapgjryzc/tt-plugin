@@ -2,11 +2,12 @@
 // Exit codes: 0 quit on request, 3 another instance is running, anything else a crash.
 
 import { fileURLToPath } from 'node:url';
+import { writeFileSync, rmSync } from 'node:fs';
 import { target } from './src/target.js';
 import { makeApp } from './src/app.js';
 import { makeServer } from './src/server.js';
 import { dpapi, toast, clearToast, registerAumid } from './src/windows.js';
-import { HOME, PORT, DB_FILE, EXIT_ALREADY_RUNNING } from './paths.mjs';
+import { HOME, PORT, DB_FILE, QUIT_FILE, EXIT_ALREADY_RUNNING } from './paths.mjs';
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -29,11 +30,17 @@ try {
   throw e;
 }
 
+// Running again undoes an earlier Quit app (R9.6). Only after taking the port, so a second
+// start changes nothing.
+rmSync(QUIT_FILE, { force: true });
+
 let quitting = false;
 async function quit(code = 0) {
   if (quitting) return;
   quitting = true;
   log('stopping');
+  // A deliberate quit: the periodic restart check must not bring the app back (R9.6).
+  try { writeFileSync(QUIT_FILE, `${new Date().toISOString()}\n`); } catch (e) { log('quit marker not written:', e?.message); }
   server.close();
   server.closeAllConnections?.();
   await app?.stop().catch((e) => log('stop failed', e?.message));

@@ -336,10 +336,20 @@ login, and no migration of the old extension's queue.
   review-hours pause, and right after start. After the computer wakes from sleep the next
   check runs at once (a timer that fired late by more than one period counts as a wake-up).
   Nothing runs while the computer sleeps.
-- **R9.6 Autostart.** `npm run autostart:on` registers a Windows scheduled task that starts
-  the app at the user's logon with no console window and restarts it if it crashes;
-  `npm run autostart:off` removes it. The queue page has **Quit app**; quitting is not a
-  crash and is not restarted until the next logon.
+- **R9.6 Autostart.** `npm run autostart:on` registers Windows scheduled tasks, all with no
+  console window, and starts the app now; `npm run autostart:off` removes them.
+  - **Chamber** starts the app at the user's logon. Its supervisor (`app/service.mjs`)
+    restarts the app if the app process crashes.
+  - **Chamber watchdog** runs every 5 minutes and starts the app if nothing listens on its
+    port. This covers the supervisor dying too (e.g. `taskkill /F /IM node.exe` killing both
+    processes at once, 2026-11-13), which neither the supervisor nor Task Scheduler can see:
+    `conhost --headless` always exits 0, so "restart on failure" never fires. A run that finds
+    the app up exits without starting anything or writing to the log.
+  - The queue page has **Quit app**; quitting is not a crash. A deliberate quit (Quit app,
+    `autostart:off`, Ctrl+C under `npm start`) writes `quit` in the data folder, and the
+    watchdog leaves the app down while it exists. The logon task ignores it, and the app
+    deletes it once it has taken the port, so the app stays off until the next logon,
+    `autostart:on` or `npm start`. A second instance (R9.3) never touches it.
 - **R9.7 No CORS workaround.** The app's requests carry no `Origin` header, so the
   declarativeNetRequest rule is gone.
 

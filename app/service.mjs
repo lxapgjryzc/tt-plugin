@@ -1,14 +1,26 @@
 // Supervisor used by autostart (requirements R9.6): runs app/main.mjs with its output in
 // app.log, and restarts it after a crash (any exit other than 0 = quit, 3 = already
 // running), waiting longer after repeated quick crashes.
+//
+// `node app/service.mjs`             the logon task: start the app unless it is running.
+// `node app/service.mjs --watchdog`  the periodic task: also stay down if the user quit
+//                                    (QUIT_FILE). It covers what this supervisor cannot:
+//                                    its own death, e.g. every node.exe killed at once.
 
 import { spawn } from 'node:child_process';
-import { createWriteStream, statSync, renameSync, mkdirSync } from 'node:fs';
+import { createWriteStream, statSync, renameSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { HOME, LOG_FILE, EXIT_ALREADY_RUNNING } from './paths.mjs';
+import { HOME, LOG_FILE, PORT, QUIT_FILE, EXIT_ALREADY_RUNNING } from './paths.mjs';
+import { launchDecision, isListening } from './launch.mjs';
 
 const MAIN = fileURLToPath(new URL('./main.mjs', import.meta.url));
 const MAX_LOG = 1024 * 1024;
+const mode = process.argv.includes('--watchdog') ? 'watchdog' : 'logon';
+
+// Decide before touching the log, so the periodic check leaves no trace when it has
+// nothing to do.
+const decision = launchDecision({ mode, running: await isListening(PORT), quit: existsSync(QUIT_FILE) });
+if (decision !== 'start') process.exit(0);
 
 mkdirSync(HOME, { recursive: true });
 try {
@@ -35,5 +47,5 @@ function run() {
     setTimeout(run, delay);
   });
 }
-log('starting');
+log(mode === 'watchdog' ? 'starting (the app was not running)' : 'starting');
 run();

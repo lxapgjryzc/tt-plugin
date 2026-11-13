@@ -1,19 +1,18 @@
 // `npm run autostart:on` / `npm run autostart:off` (requirements R9.6).
 //
-// on:  registers a Windows scheduled task "Chamber" that runs app/service.mjs at the
-//      user's logon with no console window (conhost --headless), with no run-time limit
-//      and on battery power; then starts it now.
-// off: removes the task and asks a running app to quit.
+// on:  registers the Windows scheduled tasks described in tools/autostart-tasks.mjs (start
+//      at logon, and a check every few minutes that brings a killed app back unless the user
+//      quit it); then starts the app now.
+// off: removes both tasks and asks a running app to quit.
 
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { DB_FILE, PORT } from '../app/paths.mjs';
+import { registerScript, unregisterScript, WATCHDOG_MINUTES } from './autostart-tasks.mjs';
 
-const TASK = 'Chamber';
 const SERVICE = fileURLToPath(new URL('../app/service.mjs', import.meta.url));
-const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
 function ps(script) {
   const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], { encoding: 'utf8' });
@@ -46,17 +45,10 @@ if (process.platform !== 'win32') {
 }
 
 if (mode === 'on') {
-  ps(`
-$action = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument ('--headless "' + ${q(process.execPath)} + '" "' + ${q(SERVICE)} + '"')
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\\$env:USERNAME"
-$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -StartWhenAvailable
-$principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\\$env:USERNAME" -LogonType Interactive -RunLevel Limited
-Register-ScheduledTask -TaskName ${q(TASK)} -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description 'Chamber: submits queued tenten.art drawings as review slots free up.' -Force | Out-Null
-Start-ScheduledTask -TaskName ${q(TASK)}
-`);
-  console.log(`Autostart is on. Chamber starts at logon and is starting now: http://127.0.0.1:${PORT}/`);
+  ps(registerScript({ node: process.execPath, service: SERVICE }));
+  console.log(`Autostart is on. Chamber starts at logon, comes back within ${WATCHDOG_MINUTES} minutes if it is killed, and is starting now: http://127.0.0.1:${PORT}/`);
 } else if (mode === 'off') {
-  ps(`if (Get-ScheduledTask -TaskName ${q(TASK)} -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName ${q(TASK)} -Confirm:$false }`);
+  ps(unregisterScript());
   const quit = await quitRunningApp();
   console.log(`Autostart is off.${quit ? ' The running app was asked to quit.' : ''}`);
 } else {
